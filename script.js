@@ -1,5 +1,11 @@
 // 等待DOM加载完成
 document.addEventListener('DOMContentLoaded', function() {
+    // CTA按钮点击处理
+    const ctaButton = document.getElementById('ctaButton');
+    if (ctaButton) {
+        ctaButton.addEventListener('click', scrollToUpload);
+    }
+
     // 平滑滚动到锚点
     document.querySelectorAll('a[href^="#"]').forEach(anchor => {
         anchor.addEventListener('click', function(e) {
@@ -152,21 +158,25 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 生成视频
     generateButton.addEventListener('click', async function() {
+        console.log('🎬 生成视频按钮被点击');
+        
         // 获取视频设置
         const aiModel = document.getElementById('aiModel').value;
         const videoStyle = document.getElementById('videoStyle').value;
         const videoDuration = document.getElementById('videoDuration').value;
 
+        console.log('参数:', { aiModel, videoStyle, videoDuration });
+
         // 显示进度条
         uploadOptions.style.display = 'none';
-        progressContainer.style.display = 'none';
+        progressContainer.style.display = 'block';
+        progressFill.style.width = '10%';
+        progressText.textContent = '正在上传文件...';
 
         try {
             // 首先上传文件
-            progressContainer.style.display = 'block';
-            progressFill.style.width = '10%';
-            progressText.textContent = '正在上传文件...';
-
+            console.log('1️⃣  正在上传文件...');
+            
             const formData = new FormData();
             formData.append('file', fileInput.files[0]);
 
@@ -175,15 +185,26 @@ document.addEventListener('DOMContentLoaded', function() {
                 body: formData
             });
 
+            console.log('上传响应状态:', uploadResponse.status);
+            
             if (!uploadResponse.ok) {
-                throw new Error('文件上传失败');
+                throw new Error('文件上传失败: ' + uploadResponse.status);
             }
 
             const uploadData = await uploadResponse.json();
+            console.log('上传成功，文件名:', uploadData.filename);
 
             // 然后生成视频
             progressFill.style.width = '20%';
             progressText.textContent = '正在调用AI视频生成模型...';
+            
+            console.log('2️⃣  正在调用生成视频 API...');
+            console.log('请求数据:', {
+                aiModel: aiModel,
+                videoStyle: videoStyle,
+                videoDuration: videoDuration,
+                filename: uploadData.filename
+            });
 
             const generateResponse = await fetch('http://localhost:5000/api/generate-video', {
                 method: 'POST',
@@ -198,11 +219,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 })
             });
 
+            console.log('生成响应状态:', generateResponse.status);
+            
             if (!generateResponse.ok) {
-                throw new Error('视频生成失败');
+                const errorText = await generateResponse.text();
+                console.error('生成失败响应:', errorText);
+                throw new Error('视频生成失败: ' + generateResponse.status + ' - ' + errorText);
             }
 
             const generateData = await generateResponse.json();
+            console.log('视频生成成功:', generateData);
 
             // 更新进度
             progressFill.style.width = '40%';
@@ -212,16 +238,18 @@ document.addEventListener('DOMContentLoaded', function() {
             setTimeout(() => {
                 progressFill.style.width = '60%';
                 progressText.textContent = '正在生成视频...';
-            }, 1000);
+            }, 500);
 
             setTimeout(() => {
                 progressFill.style.width = '80%';
                 progressText.textContent = '正在处理视频...';
-            }, 2000);
+            }, 1000);
 
             setTimeout(() => {
                 progressFill.style.width = '100%';
                 progressText.textContent = '视频生成完成！';
+                
+                console.log('3️⃣  视频生成完成，显示结果');
 
                 // 显示视频结果
                 setTimeout(() => {
@@ -231,11 +259,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     // 设置视频源
                     resultVideo.src = `http://localhost:5000${generateData.videoUrl}`;
                     resultVideo.load();
-                }, 500);
-            }, 3000);
+                    
+                    console.log('✅ 视频已准备就绪:', resultVideo.src);
+                }, 300);
+            }, 1500);
 
         } catch (error) {
-            console.error('生成视频时出错:', error);
+            console.error('❌ 生成视频时出错:', error);
             alert('生成视频时出错: ' + error.message);
 
             // 重置界面
@@ -246,7 +276,19 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 下载视频
     downloadButton.addEventListener('click', function() {
-        alert('在实际应用中，这里会触发视频下载功能。');
+        const videoSrc = resultVideo.src;
+        if (!videoSrc) {
+            alert('没有可下载的视频');
+            return;
+        }
+        
+        // 创建下载链接
+        const link = document.createElement('a');
+        link.href = videoSrc;
+        link.download = `generated_video_${Date.now()}.mp4`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     });
 
     // 分享视频
