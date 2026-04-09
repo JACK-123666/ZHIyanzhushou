@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智演助手 - 文档自动转换为AI视频</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="logo">智演助手</div>
+            <ul class="nav-links">
+                <li><a href="#home">首页</a></li>
+                <li><a href="#upload">上传文档</a></li>
+                <li><a href="#features">功能特点</a></li>
+                <li><a href="#about">关于</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <header id="home" class="hero">
+        <div class="container">
+            <h1>文档自动转换为AI视频</h1>
+            <p>上传您的文档，AI将自动生成精美的视频演示</p>
+            <button class="cta-button" id="ctaButton">开始使用</button>
+        </div>
+    </header>
+
+    <section id="upload" class="upload-section">
+        <div class="container">
+            <h2>上传您的文档</h2>
+            <p class="upload-intro">支持PDF、PPT、Word等格式，AI将自动转换为视频演示</p>
+
+            <div class="upload-container">
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-icon">📁</div>
+                    <h3>拖拽文件到这里</h3>
+                    <p>或点击选择文件</p>
+                    <input type="file" id="fileInput" class="file-input" accept=".pdf,.ppt,.pptx,.doc,.docx,.txt" hidden>
+                    <button class="upload-button">选择文件</button>
+                </div>
+
+                <div class="file-info" id="fileInfo" style="display: none;">
+                    <div class="file-icon">📄</div>
+                    <div class="file-details">
+                        <h3 id="fileName">文件名</h3>
+                        <p id="fileSize">文件大小</p>
+                    </div>
+                    <button class="remove-file" id="removeFile">✕</button>
+                </div>
+
+                <div class="upload-options" id="uploadOptions" style="display: none;">
+                    <h3>AI视频生成模型选择</h3>
+                    <div class="option-group">
+                        <label for="aiModel">选择AI视频生成模型</label>
+                        <select id="aiModel">
+                            <option value="seedance">Seedance (字节跳动)</option>
+                            <option value="runway">RunwayML Gen-2 (国内版)</option>
+                            <option value="pika">Pika Labs (国内版)</option>
+                        </select>
+                    </div>
+
+                    <h3>视频设置</h3>
+                    <div class="option-group">
+                        <label for="videoStyle">视频风格</label>
+                        <select id="videoStyle">
+                            <option value="business">商务风格</option>
+                            <option value="creative">创意风格</option>
+                            <option value="minimalist">简约风格</option>
+                            <option value="tech">科技风格</option>
+                        </select>
+                    </div>
+                    <div class="option-group">
+                        <label for="videoDuration">视频时长</label>
+                        <select id="videoDuration">
+                            <option value="short">短 (1-2分钟)</option>
+                            <option value="medium" selected>中 (3-5分钟)</option>
+                            <option value="long">长 (5-10分钟)</option>
+                        </select>
+                    </div>
+                    <button class="generate-button" id="generateButton">生成视频</button>
+                </div>
+
+                <div class="progress-container" id="progressContainer" style="display: none;">
+                    <h3>正在生成视频...</h3>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <p id="progressText">正在分析文档内容...</p>
+                </div>
+
+                <div class="video-result" id="videoResult" style="display: none;">
+                    <h3>视频生成完成！</h3>
+                    <div class="video-container">
+                        <video controls id="resultVideo">
+                            <source src="" type="video/mp4">
+                            您的浏览器不支持视频播放。
+                        </video>
+                    </div>
+                    <div class="video-actions">
+                        <button class="download-button">下载视频</button>
+                        <button class="share-button">分享视频</button>
+                        <button class="new-video-button">生成新视频</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="features" class="features-section">
+        <div class="container">
+            <h2>功能特点</h2>
+            <div class="features">
+                <div class="feature-card">
+                    <div class="feature-icon">🤖</div>
+                    <h3>AI智能分析</h3>
+                    <p>自动提取文档关键信息，生成智能脚本</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🎬</div>
+                    <h3>多风格模板</h3>
+                    <p>提供多种视频风格，满足不同场景需求</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🎙️</div>
+                    <h3>智能配音</h3>
+                    <p>多种语音选择，自动生成专业配音</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">⚡</div>
+                    <h3>快速生成</h3>
+                    <p>高效处理，几分钟内完成视频生成</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🎨</div>
+                    <h3>精美动画</h3>
+                    <p>自动添加动画效果，提升视频质量</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">📱</div>
+                    <h3>多端适配</h3>
+                    <p>生成的视频适配各种设备和平台</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="about" class="about">
+        <div class="container">
+            <h2>关于智演助手</h2>
+            <p>智演助手是一款基于人工智能技术的文档转视频工具，帮助用户快速将文档内容转换为精美的视频演示。无论是商务汇报、教育培训还是产品介绍，智演助手都能为您提供专业的视频生成服务。</p>
+            <div class="about-features">
+                <div class="about-feature">
+                    <h3>我们的使命</h3>
+                    <p>让每个人都能轻松创建专业视频</p>
+                </div>
+                <div class="about-feature">
+                    <h3>我们的技术</h3>
+                    <p>采用最新的AI技术，确保视频质量</p>
+                </div>
+                <div class="about-feature">
+                    <h3>我们的服务</h3>
+                    <p>提供全方位的视频生成解决方案</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2023 智演助手. 文档自动转换为AI视频平台.</p>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
