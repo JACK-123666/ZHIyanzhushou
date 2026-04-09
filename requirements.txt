@@ -1,0 +1,12 @@
+flask==2.3.3
+flask-cors==4.0.0
+requests==2.31.0
+moviepy==1.0.3
+imageio==2.31.5
+imageio-ffmpeg==0.4.9
+python-docx==1.1.0
+pypdf==3.17.4
+werkzeug==2.3.7
+python-pptx==0.6.23
+Pillow==10.1.0
+python-dotenv==1.0.0
