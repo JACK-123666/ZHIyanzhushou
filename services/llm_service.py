@@ -3,21 +3,54 @@ import re
 from openai import OpenAI
 from config import DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, STYLE_TEMPLATES, DURATION_MODES
 
-SHOT_PARSE_SYSTEM = """你是一个专业的分镜脚本解析器。解析用户提供的分镜脚本表格，输出JSON数组。
-每个分镜对象必须包含这些字段：
-- id: 镜头编号 (如 "SC01")
-- raw_visual: 镜头描述与AI视觉提示原文
-- narration: 旁白文本
-- sfx: 音效描述（无则填"无"）
-- original_duration: 标注时长秒数（无则填null）
-- characters: 角色列表，每个角色需包含 name 和 detailed_appearance（详细外貌：年龄/服装颜色款式/体型/发型/面部特征/身高/配饰）
-- location: 场景位置
-- action_summary: 主要动作摘要
-- on_screen_text: 屏幕图文（无则填"无"）
+SHOT_PARSE_SYSTEM = """你是顶级影视剧本解析AI。深度理解分镜脚本文档，提取所有视觉元素构建完整的场景描述。
+
+输出JSON格式:
+{
+  "title": "剧本标题",
+  "genre": "题材类型",
+  "global_tone": "整体基调(紧张/温馨/严肃/轻松等)",
+  "shots": [
+    {
+      "id": "SC01",
+      "raw_visual": "原文镜头描述（完整保留）",
+      "narration": "旁白文本（无则空字符串）",
+      "sfx": "音效描述",
+      "original_duration": 数字秒数或null,
+      "characters": [
+        {
+          "name": "角色名",
+          "role": "身份(保安/顾客/经理等)",
+          "detailed_appearance": "从文档中提取或根据上下文推断的完整外貌：年龄、服装(颜色+款式+材质)、体型、身高、发型发色、面部特征、标志性配饰。如果文档没有明确描述，根据角色身份合理推断——保安穿制服，经理穿西装等。"
+        }
+      ],
+      "location": "场景位置(统一命名，同场景使用相同名称)",
+      "location_detail": "该镜头的具体位置描述(如'大厅左侧'、'门口近景')",
+      "action_summary": "主要动作(谁做什么，用什么方式)",
+      "camera_hint": "镜头类型提示(广角/中景/特写/跟拍/推近等)",
+      "on_screen_text": "屏幕叠加文字",
+      "mood": "该镜头情绪(紧张/平静/急促/温馨)"
+    }
+  ],
+  "scene_map": {
+    "场景名1": ["SC01", "SC03", "SC05"],
+    "场景名2": ["SC02", "SC04"]
+  },
+  "character_summary": {
+    "角色名": "全局外貌总结(综合所有镜头信息，给出该角色在整个视频中的固定外貌描述，50-100字)"
+  }
+}
+
+重要规则:
+1. scene_map 必须正确分组——同一物理场景的所有镜头归到同一组
+2. character_summary 中每个角色的外貌必须覆盖所有镜头中该角色的出现，确保一致性
+3. 如果文档是分镜表格格式(有表头行)，自动识别列对应关系
+4. 如果文档是自由文本格式，按段落/标记符(##、--、等)分割镜头
+5. 所有描述提取必须尽可能详细，从文档原文中逐字提取视觉细节
 
 只输出JSON，不要任何其他文字。"""
 
-SHOT_PARSE_USER = """解析以下分镜脚本文档，输出JSON分镜数组:
+SHOT_PARSE_USER = """深度解析以下分镜脚本文档，提取所有视觉元素和角色细节:
 
 {document}"""
 
@@ -98,7 +131,7 @@ PROMPT_GEN_USER = """=== 视觉圣经 ===
 
 
 def parse_shots(document_text):
-    """使用DeepSeek解析文档，返回分镜数组"""
+    """使用DeepSeek深度解析文档，返回完整的剧本结构"""
     client = _get_client()
     response = client.chat.completions.create(
         model="deepseek-chat",
@@ -109,7 +142,13 @@ def parse_shots(document_text):
         temperature=0.3,
         max_tokens=8000
     )
-    return _extract_json(response.choices[0].message.content)
+    result = _extract_json(response.choices[0].message.content)
+
+    # 兼容旧格式：如果是数组直接包一层
+    if isinstance(result, list):
+        result = {'title': '未命名', 'shots': result, 'scene_map': {}, 'character_summary': {}}
+
+    return result
 
 
 def generate_prompts(shots, config):

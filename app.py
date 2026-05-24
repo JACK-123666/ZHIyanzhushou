@@ -133,7 +133,12 @@ def session_parse(session_id):
 
     try:
         content = parse_document(state['filepath'])
-        shots = parse_shots(content)
+        parsed = parse_shots(content)
+
+        shots = parsed.get('shots', parsed) if isinstance(parsed, dict) else parsed
+        scene_map = parsed.get('scene_map', {}) if isinstance(parsed, dict) else {}
+        title = parsed.get('title', '') if isinstance(parsed, dict) else ''
+        character_summary = parsed.get('character_summary', {}) if isinstance(parsed, dict) else {}
 
         mode = state['config']['duration_mode']
         for s in shots:
@@ -147,9 +152,14 @@ def session_parse(session_id):
             else:
                 s['final_duration'] = orig if orig and orig <= 8 else 8
 
-        _update_state(session_id, 'PARSED', shots=shots)
-        logger.info(f"Session {session_id}: 解析完成, {len(shots)} 个镜头")
-        return jsonify({'status': 'PARSED', 'shot_count': len(shots), 'shots': shots})
+        _update_state(session_id, 'PARSED', shots=shots,
+                       scene_map=scene_map, title=title,
+                       character_summary=character_summary)
+        logger.info(f"Session {session_id}: 解析完成, {len(shots)} 个镜头, {len(scene_map)} 个场景")
+        return jsonify({
+            'status': 'PARSED', 'shot_count': len(shots),
+            'scene_count': len(scene_map), 'title': title
+        })
 
     except Exception as e:
         logger.error(f"解析失败: {str(e)}")
@@ -195,13 +205,20 @@ def session_images(session_id):
     max_image_retries = 3
 
     # === 场景级关键帧共享 ===
-    # 同场景镜头共用一张关键帧，减少 Seedream API 调用
+    # 优先用 DeepSeek 解析出的 scene_map，否则按 location 字段分组
+    scene_map = state.get('scene_map', {})
     scene_groups = {}
-    for shot in state['shots']:
-        loc = shot.get('location', 'unknown')
-        if loc not in scene_groups:
-            scene_groups[loc] = []
-        scene_groups[loc].append(shot)
+    if scene_map:
+        for scene_name, shot_ids in scene_map.items():
+            group = [s for s in state['shots'] if s['id'] in shot_ids]
+            if group:
+                scene_groups[scene_name] = group
+    if not scene_groups:
+        for shot in state['shots']:
+            loc = shot.get('location', 'unknown')
+            if loc not in scene_groups:
+                scene_groups[loc] = []
+            scene_groups[loc].append(shot)
 
     logger.info(f"场景分组: {len(scene_groups)} 个场景, {len(state['shots'])} 个镜头 -> 只需 {len(scene_groups)} 次图片生成")
 
