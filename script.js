@@ -16,7 +16,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             if (targetElement) {
                 window.scrollTo({
-                    top: targetElement.offsetTop - 70, // 减去导航栏高度
+                    top: targetElement.offsetTop - 70,
                     behavior: 'smooth'
                 });
             }
@@ -27,7 +27,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const navbar = document.querySelector('.navbar');
     window.addEventListener('scroll', function() {
         if (window.scrollY > 50) {
-            navbar.style.boxShadow = '0 2px 10px rgba(0, 0, 0, 0.1)';
+            navbar.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
         } else {
             navbar.style.boxShadow = '0 2px 5px rgba(0, 0, 0, 0.1)';
         }
@@ -68,6 +68,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const progressContainer = document.getElementById('progressContainer');
     const progressFill = document.getElementById('progressFill');
     const progressText = document.getElementById('progressText');
+    const progressPercentage = document.getElementById('progressPercentage');
     const videoResult = document.getElementById('videoResult');
     const resultVideo = document.getElementById('resultVideo');
     const downloadButton = document.querySelector('.download-button');
@@ -87,54 +88,66 @@ document.addEventListener('DOMContentLoaded', function() {
     // 拖拽上传
     uploadArea.addEventListener('dragover', function(e) {
         e.preventDefault();
-        uploadArea.style.backgroundColor = '#f8f9fa';
-        uploadArea.style.borderColor = '#2980b9';
+        uploadArea.style.backgroundColor = 'rgba(52, 152, 219, 0.05)';
+        uploadArea.style.borderColor = '#3498db';
     });
 
     uploadArea.addEventListener('dragleave', function(e) {
         e.preventDefault();
-        uploadArea.style.backgroundColor = '#fff';
-        uploadArea.style.borderColor = '#3498db';
+        uploadArea.style.backgroundColor = '';
+        uploadArea.style.borderColor = '';
     });
 
     uploadArea.addEventListener('drop', function(e) {
         e.preventDefault();
-        uploadArea.style.backgroundColor = '#fff';
-        uploadArea.style.borderColor = '#3498db';
+        uploadArea.style.backgroundColor = '';
+        uploadArea.style.borderColor = '';
 
-        if (e.dataTransfer.files.length) {
-            handleFile(e.dataTransfer.files[0]);
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            handleFile(files[0]);
         }
     });
 
     // 文件选择处理
-    fileInput.addEventListener('change', function() {
-        if (this.files.length) {
-            handleFile(this.files[0]);
+    fileInput.addEventListener('change', function(e) {
+        const files = e.target.files;
+        if (files.length > 0) {
+            handleFile(files[0]);
         }
     });
 
-    // 处理选中的文件
+    // 处理文件
     function handleFile(file) {
-        // 检查文件类型
-        const validTypes = ['application/pdf', 'application/vnd.ms-powerpoint', 
-                           'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-                           'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-                           'text/plain'];
+        // 验证文件类型
+        const allowedTypes = [
+            'application/pdf',
+            'application/vnd.ms-powerpoint',
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+            'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'text/plain',
+            'audio/wav',
+            'audio/mpeg',
+            'audio/ogg',
+            'audio/webm'
+        ];
 
-        if (!validTypes.includes(file.type)) {
-            alert('请上传PDF、PPT、PPTX、DOC、DOCX或TXT格式的文件');
+        const allowedExtensions = ['.pdf', '.ppt', '.pptx', '.doc', '.docx', '.txt', '.wav', '.mp3', '.ogg', '.webm'];
+        const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
+
+        if (!allowedExtensions.includes(fileExtension)) {
+            alert('不支持的文件格式。请上传PDF、PPT、Word、TXT或音频文件。');
             return;
         }
 
         // 显示文件信息
         fileName.textContent = file.name;
         fileSize.textContent = formatFileSize(file.size);
-
-        // 切换显示区域
         uploadArea.style.display = 'none';
         fileInfo.style.display = 'flex';
         uploadOptions.style.display = 'block';
+        videoResult.style.display = 'none';
     }
 
     // 格式化文件大小
@@ -143,7 +156,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const k = 1024;
         const sizes = ['Bytes', 'KB', 'MB', 'GB'];
         const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
     }
 
     // 移除文件
@@ -152,41 +165,46 @@ document.addEventListener('DOMContentLoaded', function() {
         uploadArea.style.display = 'block';
         fileInfo.style.display = 'none';
         uploadOptions.style.display = 'none';
-        progressContainer.style.display = 'none';
         videoResult.style.display = 'none';
+        progressContainer.style.display = 'none';
     });
 
-    // 生成视频
+    // 生成视频按钮
     generateButton.addEventListener('click', async function() {
-        console.log('🎬 生成视频按钮被点击');
-        
-        // 获取视频设置
+        const file = fileInput.files[0];
+        if (!file) {
+            alert('请先选择一个文件');
+            return;
+        }
+
         const aiModel = document.getElementById('aiModel').value;
         const videoStyle = document.getElementById('videoStyle').value;
         const videoDuration = document.getElementById('videoDuration').value;
+        const narrator = document.getElementById('narrator').value;
 
-        console.log('参数:', { aiModel, videoStyle, videoDuration });
-
-        // 显示进度条
-        uploadOptions.style.display = 'none';
-        progressContainer.style.display = 'block';
-        progressFill.style.width = '10%';
-        progressText.textContent = '正在上传文件...';
+        console.log('1️⃣  开始上传文件...');
+        console.log('文件信息:', {
+            name: file.name,
+            size: file.size,
+            type: file.type
+        });
 
         try {
-            // 首先上传文件
-            console.log('1️⃣  正在上传文件...');
-            
-            const formData = new FormData();
-            formData.append('file', fileInput.files[0]);
+            // 显示进度条
+            uploadOptions.style.display = 'none';
+            progressContainer.style.display = 'block';
+            updateProgress(0, '正在上传文件...');
+            updateStep(1);
 
-            const uploadResponse = await fetch('http://localhost:5000/api/upload', {
+            // 上传文件
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const uploadResponse = await fetch('/api/upload', {
                 method: 'POST',
                 body: formData
             });
 
-            console.log('上传响应状态:', uploadResponse.status);
-            
             if (!uploadResponse.ok) {
                 throw new Error('文件上传失败: ' + uploadResponse.status);
             }
@@ -194,19 +212,20 @@ document.addEventListener('DOMContentLoaded', function() {
             const uploadData = await uploadResponse.json();
             console.log('上传成功，文件名:', uploadData.filename);
 
-            // 然后生成视频
-            progressFill.style.width = '20%';
-            progressText.textContent = '正在调用AI视频生成模型...';
-            
+            // 更新进度
+            updateProgress(30, '正在生成专业的AI视频prompt...');
+            updateStep(2);
+
             console.log('2️⃣  正在调用生成视频 API...');
             console.log('请求数据:', {
                 aiModel: aiModel,
                 videoStyle: videoStyle,
                 videoDuration: videoDuration,
+                narrator: narrator,
                 filename: uploadData.filename
             });
 
-            const generateResponse = await fetch('http://localhost:5000/api/generate-video', {
+            const generateResponse = await fetch('/api/generate-video', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -215,12 +234,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     aiModel: aiModel,
                     videoStyle: videoStyle,
                     videoDuration: videoDuration,
-                    filename: uploadData.filename
+                    narrator: narrator,
+                    filename: uploadData.filename,
+                    fileType: uploadData.fileType || 'document'
                 })
             });
 
             console.log('生成响应状态:', generateResponse.status);
-            
+
             if (!generateResponse.ok) {
                 const errorText = await generateResponse.text();
                 console.error('生成失败响应:', errorText);
@@ -231,48 +252,110 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log('视频生成成功:', generateData);
 
             // 更新进度
-            progressFill.style.width = '40%';
-            progressText.textContent = '正在分析文档内容...';
+            updateProgress(100, '视频生成完成！');
+            updateStep(4);
 
-            // 模拟进度更新
+            console.log('3️⃣  视频生成完成，显示结果');
+
+            // 显示视频结果
             setTimeout(() => {
-                progressFill.style.width = '60%';
-                progressText.textContent = '正在生成视频...';
+                progressContainer.style.display = 'none';
+                videoResult.style.display = 'block';
+
+                // 设置视频源
+                resultVideo.src = generateData.videoUrl;
+                resultVideo.load();
+
+                // 确保视频控件正确初始化
+                resultVideo.addEventListener('loadedmetadata', function() {
+                    console.log('✅ 视频元数据已加载，时长:', resultVideo.duration);
+                });
+
+                resultVideo.addEventListener('canplay', function() {
+                    console.log('✅ 视频可以播放');
+                });
+
+                // 修复音频控制按钮
+                fixAudioControls();
+
+                console.log('✅ 视频已准备就绪:', resultVideo.src);
             }, 500);
-
-            setTimeout(() => {
-                progressFill.style.width = '80%';
-                progressText.textContent = '正在处理视频...';
-            }, 1000);
-
-            setTimeout(() => {
-                progressFill.style.width = '100%';
-                progressText.textContent = '视频生成完成！';
-                
-                console.log('3️⃣  视频生成完成，显示结果');
-
-                // 显示视频结果
-                setTimeout(() => {
-                    progressContainer.style.display = 'none';
-                    videoResult.style.display = 'block';
-
-                    // 设置视频源
-                    resultVideo.src = `http://localhost:5000${generateData.videoUrl}`;
-                    resultVideo.load();
-                    
-                    console.log('✅ 视频已准备就绪:', resultVideo.src);
-                }, 300);
-            }, 1500);
 
         } catch (error) {
             console.error('❌ 生成视频时出错:', error);
-            alert('生成视频时出错: ' + error.message);
+
+            // 解析错误信息
+            let errorMessage = error.message;
+            if (errorMessage.includes('不支持旧的 .doc')) {
+                errorMessage = '不支持旧的 .doc 二进制格式，请将文件转换为 .docx 格式后重试';
+            } else if (errorMessage.includes('无法读取Word')) {
+                errorMessage = '无法读取Word文档，请确保文件格式正确（推荐使用 .docx 格式）';
+            } else if (errorMessage.includes('500')) {
+                errorMessage = '服务器处理出错，请检查文件格式并重试';
+            }
+
+            alert('生成视频时出错：' + errorMessage);
 
             // 重置界面
             progressContainer.style.display = 'none';
             uploadOptions.style.display = 'block';
         }
     });
+
+    // 更新进度条
+    function updateProgress(percentage, text) {
+        progressFill.style.width = percentage + '%';
+        progressPercentage.textContent = percentage + '%';
+        if (text) {
+            progressText.textContent = text;
+        }
+    }
+
+    // 更新步骤指示器
+    function updateStep(stepNumber) {
+        // 移除所有步骤的active类
+        for (let i = 1; i <= 4; i++) {
+            const step = document.getElementById('step' + i);
+            if (step) {
+                step.classList.remove('active');
+            }
+        }
+        // 添加当前步骤的active类
+        const currentStep = document.getElementById('step' + stepNumber);
+        if (currentStep) {
+            currentStep.classList.add('active');
+        }
+    }
+
+    // 修复音频控制按钮
+    function fixAudioControls() {
+        if (!resultVideo) return;
+
+        // 确保视频控件正确显示
+        resultVideo.controls = true;
+
+        // 添加音量控制事件监听
+        resultVideo.addEventListener('volumechange', function() {
+            console.log('音量已更改:', resultVideo.volume);
+        });
+
+        // 添加播放/暂停事件监听
+        resultVideo.addEventListener('play', function() {
+            console.log('视频开始播放');
+        });
+
+        resultVideo.addEventListener('pause', function() {
+            console.log('视频暂停');
+        });
+
+        // 确保音量控制按钮可用
+        const volumeButton = resultVideo.querySelector('button[aria-label*="音量"]') || 
+                          resultVideo.querySelector('button[title*="音量"]');
+        if (volumeButton) {
+            volumeButton.style.display = 'block';
+            volumeButton.disabled = false;
+        }
+    }
 
     // 下载视频
     downloadButton.addEventListener('click', function() {
@@ -281,7 +364,7 @@ document.addEventListener('DOMContentLoaded', function() {
             alert('没有可下载的视频');
             return;
         }
-        
+
         // 创建下载链接
         const link = document.createElement('a');
         link.href = videoSrc;
@@ -293,7 +376,21 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 分享视频
     shareButton.addEventListener('click', function() {
-        alert('在实际应用中，这里会打开分享选项。');
+        const videoSrc = resultVideo.src;
+        if (!videoSrc) {
+            alert('没有可分享的视频');
+            return;
+        }
+
+        // 复制视频链接到剪贴板
+        navigator.clipboard.writeText(window.location.origin + videoSrc)
+            .then(() => {
+                alert('视频链接已复制到剪贴板！');
+            })
+            .catch(err => {
+                console.error('复制失败:', err);
+                alert('复制链接失败，请手动复制地址栏中的链接');
+            });
     });
 
     // 生成新视频
@@ -305,6 +402,14 @@ document.addEventListener('DOMContentLoaded', function() {
         uploadOptions.style.display = 'none';
         progressContainer.style.display = 'none';
         fileInput.value = '';
+
+        // 重置步骤指示器
+        for (let i = 1; i <= 4; i++) {
+            const step = document.getElementById('step' + i);
+            if (step) {
+                step.classList.remove('active');
+            }
+        }
     });
 });
 

@@ -4,12 +4,37 @@
 
 ## 功能特点
 
-- 支持多种文档格式：PDF、PPT、PPTX、DOC、DOCX、TXT
-- 集成国内免费AI视频生成模型：Seedance、RunwayML Gen-2、Pika Labs
-- 多种视频风格：商务风格、创意风格、简约风格、科技风格
-- 多种视频时长：短(1-2分钟)、中(3-5分钟)、长(5-10分钟)
-- 实时进度显示：清晰展示视频生成进度
-- 视频预览与下载：生成完成后可直接预览和下载
+- **统一素材输入**：支持文档和音频作为原始素材
+  - 📄 **文档格式**：PDF、PPT(.pptx)、Word(.docx)、TXT
+  - 🎵 **音频格式**：WAV、MP3、OGG、WEBM
+- **AI智能分析**：自动分析原始素材，提取核心内容
+- **专业Prompt生成**：根据素材内容和用户要求，生成专业的AI视频生成prompt
+- **多风格模板**：商务风格、创意风格、简约风格、科技风格
+- **多时长选择**：短(1-2分钟)、中(3-5分钟)、长(5-10分钟)
+- **AI视频生成**：集成国内免费AI视频生成模型：Seedance、RunwayML Gen-2、Pika Labs
+- **实时进度显示**：清晰展示视频生成进度
+- **视频预览与下载**：生成完成后可直接预览和下载
+
+### 📌  文件格式说明
+
+| 类型 | 支持格式 | 说明 |
+|------|--------|------|
+| 文档 | .docx | ✅ 完全支持（推荐用Word格式） |
+| 文档 | .doc | ❌ 不支持旧格式（请转换为.docx） |
+| 文档 | .pdf | ✅ 支持 |
+| 文档 | .pptx | ✅ 支持 |
+| 文档 | .txt | ✅ 支持 |
+| 音频 | .wav, .mp3, .ogg | ✅ 支持 |
+
+**注意**：旧的Microsoft Word (.doc)二进制格式不支持，请使用OpenXML格式(.docx)。可以在Word中使用"另存为"将.doc转换为.docx。
+
+## 工作流程
+
+1. **上传原始素材**：用户可以上传文档或录制/上传音频
+2. **选择视频参数**：选择AI模型、视频风格、时长等参数
+3. **AI分析与Prompt生成**：系统分析原始素材，生成专业的视频生成prompt
+4. **视频制作**：使用生成的prompt调用AI视频生成服务
+5. **预览与下载**：完成视频生成后，用户可以预览并下载
 
 ## 项目结构
 
@@ -42,8 +67,8 @@ AI_VIDEO_MODELS = {
     'seedance': {
         'name': 'Seedance (字节跳动)',
         'api_url': 'https://ark.cn-beijing.volces.com/api/v3/chat/completions',
-        'api_key': os.environ.get('SEEDANCE_API_KEY', 'YOUR_SEEDANCE_API_KEY'),
-        'model': 'ep-20240601111111-xxxxx',  # 需要替换为实际的端点ID
+        'api_key': os.environ.get('SEEDANCE_API_KEY') or os.environ.get('ARK_API_KEY', ''),
+        'model': 'your_deepseek_endpoint',  # 需要替换为实际的端点ID
         'description': '字节跳动旗下的AI视频生成引擎'
     },
     # ... 其他模型配置
