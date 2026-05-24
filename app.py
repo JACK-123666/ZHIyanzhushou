@@ -1,7 +1,9 @@
 import os
 import json
 import uuid
+import time
 from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from werkzeug.utils import secure_filename
 from flask import Flask, request, jsonify, send_file, send_from_directory
 from flask_cors import CORS
@@ -14,7 +16,6 @@ from config import (
 from services.document_parser import parse_document
 from services.llm_service import parse_shots, generate_prompts
 from services.image_generator import generate_image
-from services.video_generator import generate_video
 from services.tts_service import generate_narration
 from services.composer import compose_video
 
@@ -192,16 +193,24 @@ def session_images(session_id):
     sdir = _session_dir(session_id)
     failed = []
 
+    max_image_retries = 3
+
     try:
         for shot in state['shots']:
-            try:
-                output_path = os.path.join(sdir, f"{shot['id']}_frame.png")
-                generate_image(model_config, shot.get('image_prompt', ''), resolution, output_path)
-                shot['image_path'] = output_path
-                logger.info(f"  {shot['id']}: 图片完成")
-            except Exception as e:
-                logger.warning(f"  {shot['id']}: 图片失败 - {str(e)}")
-                failed.append(shot['id'])
+            for attempt in range(max_image_retries):
+                try:
+                    output_path = os.path.join(sdir, f"{shot['id']}_frame.png")
+                    generate_image(model_config, shot.get('image_prompt', ''), resolution, output_path)
+                    shot['image_path'] = output_path
+                    logger.info(f"  {shot['id']}: 图片完成" + (f" (重试{attempt}次后成功)" if attempt > 0 else ""))
+                    break
+                except Exception as e:
+                    if attempt < max_image_retries - 1:
+                        logger.warning(f"  {shot['id']}: 第{attempt+1}次失败, 重试中...")
+                        time.sleep(2)
+                    else:
+                        logger.warning(f"  {shot['id']}: 重试{max_image_retries}次全部失败 - {str(e)}")
+                        failed.append(shot['id'])
 
         _update_state(session_id, 'IMAGES_GENERATED', shots=state['shots'], failed_shots=failed)
         return jsonify({'status': 'IMAGES_GENERATED', 'total': len(state['shots']), 'failed': failed})
@@ -222,28 +231,109 @@ def session_videos(session_id):
     sdir = _session_dir(session_id)
     failed = []
 
-    try:
-        for shot in state['shots']:
-            if not shot.get('image_path'):
-                failed.append(shot['id'])
-                continue
+    # 收集有图片的镜头
+    valid_shots = [(s, os.path.join(sdir, f"{s['id']}.mp4"))
+                   for s in state['shots'] if s.get('image_path')]
+    for s in state['shots']:
+        if not s.get('image_path'):
+            failed.append(s['id'])
 
-            try:
-                output_path = os.path.join(sdir, f"{shot['id']}.mp4")
-                duration = shot.get('final_duration', 5)
-                generate_video(
-                    model_config,
-                    shot.get('video_prompt', ''),
-                    shot['image_path'],
-                    duration,
-                    resolution,
-                    output_path
-                )
-                shot['video_path'] = output_path
-                logger.info(f"  {shot['id']}: 视频完成")
-            except Exception as e:
-                logger.warning(f"  {shot['id']}: 视频失败 - {str(e)}")
-                failed.append(shot['id'])
+    if not valid_shots:
+        return jsonify({'error': '没有可用的关键帧图片'}), 400
+
+    try:
+        api_key = model_config.get('api_key')
+        api_url = model_config['api_url']
+        model = model_config['model']
+
+        # Phase 1: 并行创建所有任务
+        logger.info(f"并行创建 {len(valid_shots)} 个 Seedance 任务...")
+        task_map = {}  # task_id -> (shot, output_path)
+
+        def create_task(shot, output_path):
+            import requests, base64
+            res_info = __import__('config').RESOLUTIONS.get(resolution, __import__('config').RESOLUTIONS['1920x1080'])
+            with open(shot['image_path'], 'rb') as f:
+                b64 = base64.b64encode(f.read()).decode()
+            mime_map = {'.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg'}
+            ext = os.path.splitext(shot['image_path'])[1].lower()
+            mime = mime_map.get(ext, 'image/png')
+            data_url = f"data:{mime};base64,{b64}"
+
+            payload = {
+                'model': model,
+                'content': [
+                    {'type': 'text', 'text': shot.get('video_prompt', '')},
+                    {'type': 'image_url', 'image_url': {'url': data_url}, 'role': 'reference_image'}
+                ],
+                'generate_audio': True,
+                'ratio': res_info['ratio'],
+                'watermark': False
+            }
+            headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {api_key}'}
+            r = requests.post(api_url, json=payload, headers=headers, timeout=(10, 60))
+            if r.status_code == 200:
+                task_id = r.json().get('id')
+                if task_id:
+                    return (task_id, shot, output_path)
+            return (None, shot, output_path)
+
+        with ThreadPoolExecutor(max_workers=min(len(valid_shots), 5)) as executor:
+            futures = [executor.submit(create_task, s, p) for s, p in valid_shots]
+            for f in as_completed(futures):
+                tid, shot, output_path = f.result()
+                if tid:
+                    task_map[tid] = (shot, output_path)
+                    logger.info(f"  {shot['id']}: 任务创建 -> {tid}")
+                else:
+                    failed.append(shot['id'])
+                    logger.warning(f"  {shot['id']}: 任务创建失败")
+
+        # Phase 2: 并行轮询所有任务
+        if task_map:
+            logger.info(f"并行轮询 {len(task_map)} 个任务...")
+
+            def poll_and_download(tid, shot, output_path):
+                import requests as req
+                h = {'Authorization': f'Bearer {api_key}'}
+                for _ in range(120):  # max 20 min per task
+                    try:
+                        r = req.get(f"{api_url}/{tid}", headers=h, timeout=30)
+                        if r.status_code != 200:
+                            time.sleep(10)
+                            continue
+                        result = r.json()
+                        status = result.get('status', '').lower()
+                        if status == 'succeeded':
+                            video_url = result.get('content', {}).get('video_url')
+                            if video_url:
+                                vr = req.get(video_url, timeout=120)
+                                if vr.status_code == 200:
+                                    with open(output_path, 'wb') as vf:
+                                        vf.write(vr.content)
+                                    return (shot['id'], True)
+                            return (shot['id'], False)
+                        if status == 'failed':
+                            return (shot['id'], False)
+                        time.sleep(10)
+                    except Exception:
+                        time.sleep(10)
+                return (shot['id'], False)
+
+            with ThreadPoolExecutor(max_workers=min(len(task_map), 5)) as executor:
+                futures = [executor.submit(poll_and_download, tid, s, p)
+                           for tid, (s, p) in task_map.items()]
+                for f in as_completed(futures):
+                    shot_id, success = f.result()
+                    if success:
+                        for s in state['shots']:
+                            if s['id'] == shot_id:
+                                s['video_path'] = os.path.join(sdir, f"{shot_id}.mp4")
+                                break
+                        logger.info(f"  {shot_id}: 视频完成")
+                    else:
+                        failed.append(shot_id)
+                        logger.warning(f"  {shot_id}: 视频失败")
 
         _update_state(session_id, 'VIDEOS_GENERATED', shots=state['shots'], failed_shots=failed)
         return jsonify({'status': 'VIDEOS_GENERATED', 'total': len(state['shots']), 'failed': failed})
@@ -315,3 +405,5 @@ if __name__ == '__main__':
         app.run(debug=True, host='0.0.0.0', port=5000)
     else:
         app.run()
+
+
