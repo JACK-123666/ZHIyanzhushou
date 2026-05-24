@@ -4,9 +4,8 @@
 
 ## 功能特点
 
-- **统一素材输入**：支持文档和音频作为原始素材
+- **统一素材输入**：支持文档作为原始素材
   - 📄 **文档格式**：PDF、PPT(.pptx)、Word(.docx)、TXT
-  - 🎵 **音频格式**：WAV、MP3、OGG、WEBM
 - **AI智能分析**：自动分析原始素材，提取核心内容
 - **专业Prompt生成**：根据素材内容和用户要求，生成专业的AI视频生成prompt
 - **多风格模板**：商务风格、创意风格、简约风格、科技风格
@@ -19,18 +18,14 @@
 
 | 类型 | 支持格式 | 说明 |
 |------|--------|------|
-| 文档 | .docx | ✅ 完全支持（推荐用Word格式） |
-| 文档 | .doc | ❌ 不支持旧格式（请转换为.docx） |
+| 文档 | .docx | ✅ 完全支持 |
 | 文档 | .pdf | ✅ 支持 |
 | 文档 | .pptx | ✅ 支持 |
 | 文档 | .txt | ✅ 支持 |
-| 音频 | .wav, .mp3, .ogg | ✅ 支持 |
-
-**注意**：旧的Microsoft Word (.doc)二进制格式不支持，请使用OpenXML格式(.docx)。可以在Word中使用"另存为"将.doc转换为.docx。
 
 ## 工作流程
 
-1. **上传原始素材**：用户可以上传文档或录制/上传音频
+1. **上传原始素材**：用户可以上传文档文件
 2. **选择视频参数**：选择AI模型、视频风格、时长等参数
 3. **AI分析与Prompt生成**：系统分析原始素材，生成专业的视频生成prompt
 4. **视频制作**：使用生成的prompt调用AI视频生成服务
@@ -40,14 +35,21 @@
 
 ```
 simple_webpage/
-├── index.html          # 前端页面
-├── styles.css          # 样式表
-├── script.js           # 前端脚本
-├── app.py              # 后端服务
-├── requirements.txt    # Python依赖
-├── README.md           # 项目说明
-├── uploads/            # 上传文件目录（自动创建）
-└── outputs/            # 输出视频目录（自动创建）
+├── app.py                  # Flask 入口 + 路由
+├── config.py               # 集中配置（密钥、模型、常量）
+├── services/
+│   ├── document_parser.py  # 文档解析（TXT/DOCX/PDF/PPTX）
+│   ├── prompt_generator.py # AI 视频 prompt 生成
+│   └── video_generator.py  # Seedance API 视频生成
+├── logger_config.py        # 日志系统
+├── index.html              # 前端页面
+├── styles.css              # 样式表
+├── script.js               # 前端脚本
+├── requirements.txt        # Python 依赖
+├── api/index.py            # Vercel Serverless 入口
+├── vercel.json             # Vercel 部署配置
+├── uploads/                # 上传文件目录
+└── outputs/                # 输出视频目录
 ```
 
 ## 安装与运行
