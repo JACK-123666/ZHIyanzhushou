@@ -1,1 +1,23 @@
+# 环境变量（含密钥）
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# 运行时目录
+uploads/
+outputs/
+logs/
+
+# IDE
+.vscode/
+.idea/
+
+# Vercel
 .vercel
+
+# OS
+.DS_Store
+Thumbs.db
