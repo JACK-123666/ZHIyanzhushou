@@ -4,12 +4,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # --- 密钥 ---
+ARK_API_KEY = os.environ.get('ARK_API_KEY', '')
 DEEPSEEK_API_KEY = os.environ.get('DEEPSEEK_API_KEY', '')
 DEEPSEEK_BASE_URL = os.environ.get('DEEPSEEK_BASE_URL', 'https://api.deepseek.com/v1')
-SEEDREAM_API_KEY = os.environ.get('SEEDREAM_API_KEY', '')
-SEEDREAM_ENDPOINT = os.environ.get('SEEDREAM_ENDPOINT', '')
-SEEDANCE_API_KEY = os.environ.get('SEEDANCE_API_KEY', '')
-SEEDANCE_ENDPOINT = os.environ.get('SEEDANCE_ENDPOINT', '')
 
 # --- 上传限制 ---
 MAX_UPLOAD_SIZE = 50 * 1024 * 1024
@@ -49,9 +46,9 @@ CONSISTENCY_STRATEGIES = {
 }
 
 RESOLUTIONS = {
-    '1920x1080': {'label': '1920x1080 (16:9)', 'width': 1920, 'height': 1080},
-    '1024x1024': {'label': '1024x1024 (1:1)', 'width': 1024, 'height': 1024},
-    '1080x1920': {'label': '1080x1920 (9:16)', 'width': 1080, 'height': 1920}
+    '1920x1080': {'label': '1920x1080 (16:9)', 'width': 1920, 'height': 1080, 'ratio': '16:9', 'size': '2K'},
+    '1024x1024': {'label': '1024x1024 (1:1)', 'width': 1024, 'height': 1024, 'ratio': '1:1', 'size': '1K'},
+    '1080x1920': {'label': '1080x1920 (9:16)', 'width': 1080, 'height': 1920, 'ratio': '9:16', 'size': '2K'}
 }
 
 # --- 模型配置 ---
@@ -63,16 +60,16 @@ AI_MODELS = {
         'model': 'deepseek-chat'
     },
     'seedream': {
-        'name': 'Seedream (豆包文生图)',
-        'api_url': 'https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks',
-        'api_key': SEEDREAM_API_KEY,
-        'model': SEEDREAM_ENDPOINT or 'doubao-seedream-5-0-260128'
+        'name': 'Seedream 5.0 Lite (豆包文生图)',
+        'api_url': 'https://ark.cn-beijing.volces.com/api/v3/images/generations',
+        'api_key': ARK_API_KEY,
+        'model': os.environ.get('SEEDREAM_ENDPOINT', 'your_seedream_endpoint')
     },
     'seedance': {
-        'name': 'Seedance 2.0 Flash (豆包图生视频)',
+        'name': 'Seedance 2.0 Fast (豆包图生视频)',
         'api_url': 'https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks',
-        'api_key': SEEDANCE_API_KEY,
-        'model': SEEDANCE_ENDPOINT or 'seedance-2.0-flash'
+        'api_key': ARK_API_KEY,
+        'model': os.environ.get('SEEDANCE_ENDPOINT', 'your_seedance_endpoint')
     }
 }
 

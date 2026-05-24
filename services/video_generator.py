@@ -5,9 +5,9 @@ from config import RESOLUTIONS, MAX_RETRIES, RETRY_BASE_DELAY, RETRY_MAX_DELAY
 
 
 def generate_video(model_config, video_prompt, image_path, duration, resolution_key, output_path):
-    """Seedance 2.0 Flash 图生视频：图片 + prompt -> 视频"""
+    """Seedance 2.0 Fast 图生视频：参考图 + 文本 -> 视频"""
     api_key = model_config.get('api_key')
-    api_url = model_config.get('video_api_url', model_config.get('api_url'))
+    api_url = model_config.get('api_url')
     model = model_config.get('model')
 
     if not api_key or not model:
@@ -15,18 +15,24 @@ def generate_video(model_config, video_prompt, image_path, duration, resolution_
 
     res = RESOLUTIONS.get(resolution_key, RESOLUTIONS['1920x1080'])
 
+    # 先上传图片获取 URL（如果需要的话，用 data URL 方式）
+    # Seedance 支持 image_url 格式
     payload = {
         'model': model,
         'content': [
             {
-                'type': 'image_url',
-                'image_url': {'url': _file_to_data_url(image_path)}
+                'type': 'text',
+                'text': video_prompt
             },
             {
-                'type': 'text',
-                'text': f"{video_prompt} --duration {duration} --width {res['width']} --height {res['height']}"
+                'type': 'image_url',
+                'image_url': {'url': _file_to_data_url(image_path)},
+                'role': 'reference_image'
             }
-        ]
+        ],
+        'generate_audio': True,
+        'ratio': res['ratio'],
+        'watermark': False
     }
 
     headers = {
@@ -87,7 +93,7 @@ def _create_task(api_url, headers, payload):
     return None
 
 
-def _poll_task(api_url, headers, task_id, max_attempts=30, interval=10):
+def _poll_task(api_url, headers, task_id, max_attempts=60, interval=10):
     for _ in range(max_attempts):
         try:
             r = requests.get(f"{api_url}/{task_id}", headers=headers, timeout=30)
@@ -97,7 +103,7 @@ def _poll_task(api_url, headers, task_id, max_attempts=30, interval=10):
             result = r.json()
             status = result.get('status', '').lower()
             if status == 'succeeded':
-                return result.get('result', {}).get('video_url')
+                return result.get('content', {}).get('video_url')
             if status == 'failed':
                 return None
             time.sleep(interval)

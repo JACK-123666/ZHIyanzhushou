@@ -5,9 +5,9 @@ from config import RESOLUTIONS, MAX_RETRIES, RETRY_BASE_DELAY, RETRY_MAX_DELAY
 
 
 def generate_image(model_config, image_prompt, resolution_key, output_path):
-    """调用 Seedream 文生图 API 生成关键帧"""
+    """调用 Seedream 5.0 Lite 文生图 API（同步接口）"""
     api_key = model_config.get('api_key')
-    api_url = model_config.get('video_api_url', model_config.get('api_url'))
+    api_url = model_config.get('api_url')
     model = model_config.get('model')
 
     if not api_key or not model:
@@ -17,10 +17,12 @@ def generate_image(model_config, image_prompt, resolution_key, output_path):
 
     payload = {
         'model': model,
-        'content': [{
-            'type': 'text',
-            'text': f"{image_prompt} --width {res['width']} --height {res['height']}"
-        }]
+        'prompt': image_prompt,
+        'sequential_image_generation': 'disabled',
+        'response_format': 'url',
+        'size': res['size'],
+        'stream': False,
+        'watermark': True
     }
 
     headers = {
@@ -28,13 +30,9 @@ def generate_image(model_config, image_prompt, resolution_key, output_path):
         'Authorization': f'Bearer {api_key}'
     }
 
-    task_id = _create_task(api_url, headers, payload)
-    if not task_id:
-        raise RuntimeError("无法创建 Seedream 图片生成任务")
-
-    image_url = _poll_task(api_url, headers, task_id)
+    image_url = _call_api(api_url, headers, payload)
     if not image_url:
-        raise RuntimeError("Seedream 任务未完成")
+        raise RuntimeError("Seedream 图片生成失败")
 
     _download_file(image_url, output_path)
 
@@ -44,10 +42,10 @@ def generate_image(model_config, image_prompt, resolution_key, output_path):
     return output_path
 
 
-def _create_task(api_url, headers, payload):
+def _call_api(api_url, headers, payload):
     for attempt in range(MAX_RETRIES):
         try:
-            r = requests.post(api_url, json=payload, headers=headers, timeout=(10, 60))
+            r = requests.post(api_url, json=payload, headers=headers, timeout=(10, 120))
             if r.status_code == 429:
                 time.sleep(min(RETRY_BASE_DELAY * (2 ** attempt) * 2, RETRY_MAX_DELAY))
                 continue
@@ -57,36 +55,14 @@ def _create_task(api_url, headers, payload):
             if r.status_code != 200:
                 return None
             result = r.json()
-            task_id = result.get('id')
-            if task_id:
-                return task_id
-            if attempt < MAX_RETRIES - 1:
-                time.sleep(min(RETRY_BASE_DELAY * (2 ** attempt), RETRY_MAX_DELAY))
+            # 同步接口直接返回 url
+            return result.get('data', [{}])[0].get('url') if 'data' in result else result.get('url')
         except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
             if attempt < MAX_RETRIES - 1:
                 time.sleep(min(RETRY_BASE_DELAY * (2 ** attempt), RETRY_MAX_DELAY))
         except Exception:
             if attempt < MAX_RETRIES - 1:
                 time.sleep(min(RETRY_BASE_DELAY * (2 ** attempt), RETRY_MAX_DELAY))
-    return None
-
-
-def _poll_task(api_url, headers, task_id, max_attempts=30, interval=10):
-    for _ in range(max_attempts):
-        try:
-            r = requests.get(f"{api_url}/{task_id}", headers=headers, timeout=30)
-            if r.status_code != 200:
-                time.sleep(interval)
-                continue
-            result = r.json()
-            status = result.get('status', '').lower()
-            if status == 'succeeded':
-                return result.get('result', {}).get('image_url') or result.get('result', {}).get('video_url')
-            if status == 'failed':
-                return None
-            time.sleep(interval)
-        except Exception:
-            time.sleep(interval)
     return None
 
 
