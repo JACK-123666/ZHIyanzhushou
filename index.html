@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>智演助手 - 智能文档视频生成平台</title>
+    <title>智演助手 1.0 - 分镜脚本视频生成平台</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -12,12 +12,11 @@
         <div class="container">
             <div class="logo">
                 <span class="logo-icon">🎬</span>
-                <span class="logo-text">智演助手</span>
+                <span class="logo-text">智演助手 1.0</span>
             </div>
             <ul class="nav-links">
                 <li><a href="#home">首页</a></li>
-                <li><a href="#upload">上传文档</a></li>
-                <li><a href="#features">功能特点</a></li>
+                <li><a href="#workspace">工作台</a></li>
                 <li><a href="#about">关于</a></li>
             </ul>
         </div>
@@ -26,46 +25,30 @@
     <header id="home" class="hero">
         <div class="container">
             <div class="hero-content">
-                <h1>智能文档视频生成平台</h1>
-                <p>上传文档，AI自动分析内容并生成专业视频prompt，制作高质量演示视频</p>
+                <h1>分镜脚本 → 视频，全自动</h1>
+                <p>上传分镜脚本文档，AI 自动解析、文生图、图生视频、配音合成，一键输出完整视频</p>
                 <button class="cta-button" id="ctaButton">
-                    <span class="button-text">立即开始</span>
+                    <span class="button-text">开始创作</span>
                     <span class="button-icon">→</span>
                 </button>
-            </div>
-            <div class="hero-features">
-                <div class="feature-badge">
-                    <span class="badge-icon">⚡</span>
-                    <span class="badge-text">快速生成</span>
-                </div>
-                <div class="feature-badge">
-                    <span class="badge-icon">🎨</span>
-                    <span class="badge-text">多种风格</span>
-                </div>
-                <div class="feature-badge">
-                    <span class="badge-icon">🤖</span>
-                    <span class="badge-text">AI驱动</span>
-                </div>
             </div>
         </div>
     </header>
 
-    <section id="upload" class="upload-section">
+    <section id="workspace" class="upload-section">
         <div class="container">
             <div class="section-header">
-                <h2>上传您的文档</h2>
-                <p class="section-subtitle">支持PDF、PPT、Word等多种格式，AI智能转换</p>
+                <h2>工作台</h2>
+                <p class="section-subtitle">上传分镜脚本文档（.docx / .txt），配置参数，一键生成</p>
             </div>
 
             <div class="upload-container">
                 <div class="upload-area" id="uploadArea">
                     <div class="upload-icon">📁</div>
-                    <h3>拖拽文件到此处或点击上传</h3>
-                    <p class="upload-hint">支持 PDF、PPT、Word、TXT 或音频文件</p>
-                    <input type="file" id="fileInput" class="file-input" accept=".pdf,.ppt,.pptx,.doc,.docx,.txt,.wav,.mp3,.ogg,.webm" hidden>
-                    <button class="upload-button">
-                        <span class="button-text">选择文件</span>
-                    </button>
+                    <h3>拖拽分镜脚本文件到此处或点击上传</h3>
+                    <p class="upload-hint">支持 .docx（Word表格）或 .txt（纯文本）</p>
+                    <input type="file" id="fileInput" class="file-input" accept=".docx,.txt" hidden>
+                    <button class="upload-button"><span class="button-text">选择文件</span></button>
                 </div>
 
                 <div class="file-info" id="fileInfo" style="display: none;">
@@ -77,165 +60,100 @@
                     <button class="remove-file" id="removeFile" title="移除文件">✕</button>
                 </div>
 
-                <div class="upload-options" id="uploadOptions" style="display: none;">
-                    <div class="options-header">
-                        <h3>视频生成设置</h3>
-                        <p class="options-hint">自定义您的视频风格和参数</p>
-                    </div>
-
+                <div class="config-panel" id="configPanel" style="display: none;">
+                    <div class="options-header"><h3>生成配置</h3></div>
                     <div class="options-grid">
                         <div class="option-group">
-                            <label for="aiModel">
-                                <span class="label-icon">🤖</span>
-                                <span class="label-text">AI模型</span>
-                            </label>
-                            <select id="aiModel" class="modern-select">
-                                <option value="seedance">Seedance 1.5 Pro (推荐)</option>
-                                <option value="runway">RunwayML Gen-2</option>
-                                <option value="pika">Pika Labs</option>
+                            <label>🎨 视觉风格</label>
+                            <select id="styleTemplate" class="modern-select">
+                                <option value="3d_cartoon">3D卡通</option>
+                                <option value="2d_flat">2D扁平</option>
+                                <option value="semi_realistic">写实简化</option>
+                                <option value="pencil_sketch">素描线稿</option>
                             </select>
                         </div>
-
                         <div class="option-group">
-                            <label for="videoStyle">
-                                <span class="label-icon">🎨</span>
-                                <span class="label-text">视频风格</span>
-                            </label>
-                            <select id="videoStyle" class="modern-select">
-                                <option value="business">商务专业</option>
-                                <option value="creative">创意艺术</option>
-                                <option value="minimalist">极简风格</option>
-                                <option value="tech">科技未来</option>
+                            <label>⏱️ 时长模式</label>
+                            <select id="durationMode" class="modern-select">
+                                <option value="uniform">统一5秒</option>
+                                <option value="strict">严格按脚本</option>
+                                <option value="auto_split">自动拆分(>8s)</option>
                             </select>
                         </div>
-
                         <div class="option-group">
-                            <label for="videoDuration">
-                                <span class="label-icon">⏱️</span>
-                                <span class="label-text">视频时长</span>
-                            </label>
-                            <select id="videoDuration" class="modern-select">
-                                <option value="short">短 (30秒)</option>
-                                <option value="medium" selected>中 (60秒)</option>
-                                <option value="long">长 (100秒)</option>
+                            <label>👤 角色一致性</label>
+                            <select id="consistencyStrategy" class="modern-select">
+                                <option value="generic">通用无面孔</option>
+                                <option value="reference">参考图驱动</option>
+                                <option value="random">随机生成</option>
                             </select>
                         </div>
-
                         <div class="option-group">
-                            <label for="narrator">
-                                <span class="label-icon">🎙️</span>
-                                <span class="label-text">配音风格</span>
-                            </label>
-                            <select id="narrator" class="modern-select">
-                                <option value="female1">温柔女声</option>
-                                <option value="female2">活泼女声</option>
-                                <option value="male1">沉稳男声</option>
-                                <option value="male2">温和男声</option>
+                            <label>📐 分辨率</label>
+                            <select id="resolution" class="modern-select">
+                                <option value="1920x1080">1920x1080 (16:9)</option>
+                                <option value="1024x1024">1024x1024 (1:1)</option>
+                                <option value="1080x1920">1080x1920 (9:16)</option>
                             </select>
+                        </div>
+                        <div class="option-group">
+                            <label>💬 自动字幕</label>
+                            <select id="autoSubtitle" class="modern-select">
+                                <option value="yes">是</option>
+                                <option value="no">否</option>
+                            </select>
+                        </div>
+                        <div class="option-group">
+                            <label>🔊 自动音效</label>
+                            <select id="autoSfx" class="modern-select">
+                                <option value="no">否</option>
+                                <option value="yes">是</option>
+                            </select>
+                        </div>
+                        <div class="option-group">
+                            <label>🎵 BGM音量</label>
+                            <input type="range" id="bgmVolume" min="0" max="100" value="20" class="volume-slider">
+                            <span id="bgmVolumeLabel">20%</span>
                         </div>
                     </div>
-
                     <button class="generate-button" id="generateButton">
-                        <span class="button-icon">🎬</span>
-                        <span class="button-text">生成视频</span>
+                        <span class="button-icon">🚀</span>
+                        <span class="button-text">开始生成</span>
                     </button>
                 </div>
 
                 <div class="progress-container" id="progressContainer" style="display: none;">
                     <div class="progress-header">
-                        <h3>正在生成视频...</h3>
-                        <p id="progressText">正在分析文档内容...</p>
+                        <h3 id="progressTitle">准备中...</h3>
+                        <p id="progressText">正在上传文件</p>
                     </div>
-                    <div class="progress-bar">
-                        <div class="progress-fill" id="progressFill"></div>
-                        <div class="progress-percentage" id="progressPercentage">0%</div>
-                    </div>
-                    <div class="progress-steps">
-                        <div class="step active" id="step1">
-                            <div class="step-icon">📤</div>
-                            <div class="step-text">上传</div>
-                        </div>
-                        <div class="step" id="step2">
-                            <div class="step-icon">📝</div>
-                            <div class="step-text">分析</div>
-                        </div>
-                        <div class="step" id="step3">
-                            <div class="step-icon">🤖</div>
-                            <div class="step-text">生成</div>
-                        </div>
-                        <div class="step" id="step4">
-                            <div class="step-icon">✅</div>
-                            <div class="step-text">完成</div>
-                        </div>
+                    <div class="pipeline-steps">
+                        <div class="pipeline-step" id="pstep1"><span class="pstep-icon">📤</span><span>上传</span></div>
+                        <div class="pipeline-step" id="pstep2"><span class="pstep-icon">📝</span><span>解析</span></div>
+                        <div class="pipeline-step" id="pstep3"><span class="pstep-icon">💡</span><span>Prompt</span></div>
+                        <div class="pipeline-step" id="pstep4"><span class="pstep-icon">🖼️</span><span>图片</span></div>
+                        <div class="pipeline-step" id="pstep5"><span class="pstep-icon">🎬</span><span>视频</span></div>
+                        <div class="pipeline-step" id="pstep6"><span class="pstep-icon">✅</span><span>合成</span></div>
                     </div>
                 </div>
 
                 <div class="video-result" id="videoResult" style="display: none;">
                     <div class="result-header">
                         <h3>🎉 视频生成完成！</h3>
-                        <p class="result-subtitle">您的AI生成视频已准备就绪</p>
                     </div>
                     <div class="video-container">
                         <video controls id="resultVideo" preload="metadata">
                             <source src="" type="video/mp4">
-                            您的浏览器不支持视频播放。
                         </video>
                     </div>
                     <div class="video-actions">
-                        <button class="action-button download-button">
-                            <span class="button-icon">⬇️</span>
-                            <span class="button-text">下载视频</span>
+                        <button class="action-button download-button" id="downloadBtn">
+                            <span>⬇️ 下载视频</span>
                         </button>
-                        <button class="action-button share-button">
-                            <span class="button-icon">🔗</span>
-                            <span class="button-text">分享视频</span>
-                        </button>
-                        <button class="action-button new-video-button">
-                            <span class="button-icon">🔄</span>
-                            <span class="button-text">生成新视频</span>
+                        <button class="action-button new-video-button" id="newVideoBtn">
+                            <span>🔄 生成新视频</span>
                         </button>
                     </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <section id="features" class="features-section">
-        <div class="container">
-            <div class="section-header">
-                <h2>核心功能</h2>
-                <p class="section-subtitle">强大的AI驱动功能，轻松创建专业视频</p>
-            </div>
-            <div class="features">
-                <div class="feature-card">
-                    <div class="feature-icon">📁</div>
-                    <h3>多格式支持</h3>
-                    <p>支持PDF、PPT、Word、TXT等多种文档格式，以及音频文件</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">🤖</div>
-                    <h3>AI智能分析</h3>
-                    <p>深度分析文档内容，自动提取关键信息和核心要点</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">✍️</div>
-                    <h3>Prompt生成</h3>
-                    <p>基于文档内容，自动生成专业的AI视频制作prompt</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">🎬</div>
-                    <h3>视频生成</h3>
-                    <p>使用先进AI模型，生成高质量的专业视频内容</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">🎨</div>
-                    <h3>多种风格</h3>
-                    <p>商务、创意、极简、科技等多种风格可选</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">📱</div>
-                    <h3>多端适配</h3>
-                    <p>生成的视频适配各种设备和平台，随时随地观看</p>
                 </div>
             </div>
         </div>
@@ -245,81 +163,18 @@
         <div class="container">
             <div class="about-content">
                 <div class="about-text">
-                    <h2>关于智演助手</h2>
-                    <p>智演助手是一款基于先进AI技术的智能视频生成平台。通过深度学习和自然语言处理技术，我们能够自动分析您的文档内容，提取关键信息，并生成专业的视频制作prompt，最终制作出高质量的视频演示。</p>
-                    <p>无论是商务汇报、教育培训还是产品介绍，智演助手都能为您提供专业的视频生成服务，让您轻松创建出专业级的视频内容。</p>
-                    <div class="about-features">
-                        <div class="about-feature">
-                            <h3>🎯 我们的使命</h3>
-                            <p>让每个人都能轻松创建专业视频</p>
-                        </div>
-                        <div class="about-feature">
-                            <h3>🚀 我们的技术</h3>
-                            <p>采用最新的AI技术，确保视频质量</p>
-                        </div>
-                        <div class="about-feature">
-                            <h3>💡 我们的服务</h3>
-                            <p>提供全方位的视频生成解决方案</p>
-                        </div>
-                    </div>
+                    <h2>关于智演助手 1.0</h2>
+                    <p>基于 DeepSeek V4 + 豆包 Seedream + Seedance 2.0 Flash 的全自动视频生成流水线。上传分镜脚本，AI 自动完成从解析到合成的全部工作。</p>
                 </div>
                 <div class="about-stats">
-                    <div class="stat-card">
-                        <div class="stat-number">10+</div>
-                        <div class="stat-label">支持格式</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-number">4</div>
-                        <div class="stat-label">视频风格</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-number">3</div>
-                        <div class="stat-label">AI模型</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-number">∞</div>
-                        <div class="stat-label">创作可能</div>
-                    </div>
+                    <div class="stat-card"><div class="stat-number">6</div><div class="stat-label">流水线阶段</div></div>
+                    <div class="stat-card"><div class="stat-number">3</div><div class="stat-label">AI 模型</div></div>
                 </div>
             </div>
         </div>
     </section>
 
-    <footer class="footer">
-        <div class="container">
-            <div class="footer-content">
-                <div class="footer-brand">
-                    <div class="logo">
-                        <span class="logo-icon">🎬</span>
-                        <span class="logo-text">智演助手</span>
-                    </div>
-                    <p>智能文档视频生成平台</p>
-                </div>
-                <div class="footer-links">
-                    <h4>快速链接</h4>
-                    <ul>
-                        <li><a href="#home">首页</a></li>
-                        <li><a href="#upload">上传文档</a></li>
-                        <li><a href="#features">功能特点</a></li>
-                        <li><a href="#about">关于</a></li>
-                    </ul>
-                </div>
-                <div class="footer-links">
-                    <h4>支持</h4>
-                    <ul>
-                        <li><a href="#">帮助中心</a></li>
-                        <li><a href="#">使用教程</a></li>
-                        <li><a href="#">常见问题</a></li>
-                        <li><a href="#">联系我们</a></li>
-                    </ul>
-                </div>
-            </div>
-            <div class="footer-bottom">
-                <p>&copy; 2024 智演助手. 智能文档视频生成平台.</p>
-            </div>
-        </div>
-    </footer>
-
+    <footer class="footer"><div class="container"><p>&copy; 2026 智演助手 1.0</p></div></footer>
     <script src="script.js"></script>
 </body>
 </html>

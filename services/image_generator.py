@@ -4,29 +4,23 @@ import requests
 from config import RESOLUTIONS, MAX_RETRIES, RETRY_BASE_DELAY, RETRY_MAX_DELAY
 
 
-def generate_video(model_config, video_prompt, image_path, duration, resolution_key, output_path):
-    """Seedance 2.0 Flash 图生视频：图片 + prompt -> 视频"""
+def generate_image(model_config, image_prompt, resolution_key, output_path):
+    """调用 Seedream 文生图 API 生成关键帧"""
     api_key = model_config.get('api_key')
     api_url = model_config.get('video_api_url', model_config.get('api_url'))
     model = model_config.get('model')
 
     if not api_key or not model:
-        raise ValueError("Seedance API 配置不完整")
+        raise ValueError("Seedream API 配置不完整")
 
     res = RESOLUTIONS.get(resolution_key, RESOLUTIONS['1920x1080'])
 
     payload = {
         'model': model,
-        'content': [
-            {
-                'type': 'image_url',
-                'image_url': {'url': _file_to_data_url(image_path)}
-            },
-            {
-                'type': 'text',
-                'text': f"{video_prompt} --duration {duration} --width {res['width']} --height {res['height']}"
-            }
-        ]
+        'content': [{
+            'type': 'text',
+            'text': f"{image_prompt} --width {res['width']} --height {res['height']}"
+        }]
     }
 
     headers = {
@@ -36,28 +30,18 @@ def generate_video(model_config, video_prompt, image_path, duration, resolution_
 
     task_id = _create_task(api_url, headers, payload)
     if not task_id:
-        raise RuntimeError("无法创建 Seedance 视频生成任务")
+        raise RuntimeError("无法创建 Seedream 图片生成任务")
 
-    video_url = _poll_task(api_url, headers, task_id)
-    if not video_url:
-        raise RuntimeError("Seedance 视频生成任务未完成")
+    image_url = _poll_task(api_url, headers, task_id)
+    if not image_url:
+        raise RuntimeError("Seedream 任务未完成")
 
-    _download_file(video_url, output_path)
+    _download_file(image_url, output_path)
 
     if not os.path.exists(output_path) or os.path.getsize(output_path) == 0:
-        raise RuntimeError("下载的视频为空")
+        raise RuntimeError("下载的图片为空")
 
     return output_path
-
-
-def _file_to_data_url(filepath):
-    import base64
-    ext = os.path.splitext(filepath)[1].lower()
-    mime_map = {'.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp'}
-    mime = mime_map.get(ext, 'image/png')
-    with open(filepath, 'rb') as f:
-        b64 = base64.b64encode(f.read()).decode()
-    return f"data:{mime};base64,{b64}"
 
 
 def _create_task(api_url, headers, payload):
@@ -97,7 +81,7 @@ def _poll_task(api_url, headers, task_id, max_attempts=30, interval=10):
             result = r.json()
             status = result.get('status', '').lower()
             if status == 'succeeded':
-                return result.get('result', {}).get('video_url')
+                return result.get('result', {}).get('image_url') or result.get('result', {}).get('video_url')
             if status == 'failed':
                 return None
             time.sleep(interval)

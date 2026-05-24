@@ -2,7 +2,8 @@ flask==2.3.3
 flask-cors==4.0.0
 requests==2.31.0
 python-docx==1.1.0
-pypdf==3.17.4
 werkzeug==2.3.7
-python-pptx==0.6.23
 python-dotenv==1.0.0
+openai>=1.0.0
+# ffmpeg 需系统安装（用于视频拼接）
+edge-tts>=6.1.0
