@@ -158,12 +158,12 @@ async function startPipeline() {
         if (!res.ok) throw new Error(data.error);
 
         progressTitle.textContent = '生成关键帧图片...';
-        progressText.textContent = 'Seedream 文生图';
+        progressText.textContent = 'Seedream 文生图 (场景级共享，减少消耗)';
         updatePipelineStep('IMAGES_GENERATED');
         res = await fetch('/api/session/' + currentSessionId + '/images', { method: 'POST' });
         data = await res.json();
         if (!res.ok) throw new Error(data.error);
-        if (data.failed.length > 0) showToast(data.failed.length + ' 个镜头图片生成失败', 'error');
+        if (data.failed.length > 0) showToast(data.failed.length + ' 个场景生成失败', 'error');
 
         progressTitle.textContent = '生成视频片段...';
         progressText.textContent = 'Seedance 图生视频';

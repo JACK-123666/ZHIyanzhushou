@@ -192,28 +192,53 @@ def session_images(session_id):
     resolution = state['config']['resolution']
     sdir = _session_dir(session_id)
     failed = []
-
     max_image_retries = 3
 
+    # === 场景级关键帧共享 ===
+    # 同场景镜头共用一张关键帧，减少 Seedream API 调用
+    scene_groups = {}
+    for shot in state['shots']:
+        loc = shot.get('location', 'unknown')
+        if loc not in scene_groups:
+            scene_groups[loc] = []
+        scene_groups[loc].append(shot)
+
+    logger.info(f"场景分组: {len(scene_groups)} 个场景, {len(state['shots'])} 个镜头 -> 只需 {len(scene_groups)} 次图片生成")
+
     try:
-        for shot in state['shots']:
+        for loc, group in scene_groups.items():
+            master_shot = group[0]
+            keyframe_path = os.path.join(sdir, f"scene_{loc.replace(' ', '_')[:20]}_frame.png")
+
+            # 用该场景第一个镜头的 prompt 生成关键帧
             for attempt in range(max_image_retries):
                 try:
-                    output_path = os.path.join(sdir, f"{shot['id']}_frame.png")
-                    generate_image(model_config, shot.get('image_prompt', ''), resolution, output_path)
-                    shot['image_path'] = output_path
-                    logger.info(f"  {shot['id']}: 图片完成" + (f" (重试{attempt}次后成功)" if attempt > 0 else ""))
+                    generate_image(model_config, master_shot.get('image_prompt', ''), resolution, keyframe_path)
+                    logger.info(f"  场景 '{loc}': 关键帧完成 ({len(group)}个镜头共享)" + (f" (重试{attempt}次)" if attempt > 0 else ""))
                     break
                 except Exception as e:
                     if attempt < max_image_retries - 1:
-                        logger.warning(f"  {shot['id']}: 第{attempt+1}次失败, 重试中...")
+                        logger.warning(f"  场景 '{loc}': 第{attempt+1}次失败, 重试中...")
                         time.sleep(2)
                     else:
-                        logger.warning(f"  {shot['id']}: 重试{max_image_retries}次全部失败 - {str(e)}")
-                        failed.append(shot['id'])
+                        logger.warning(f"  场景 '{loc}': 重试全部失败 - {str(e)}")
+                        for s in group:
+                            failed.append(s['id'])
+                        keyframe_path = None
 
-        _update_state(session_id, 'IMAGES_GENERATED', shots=state['shots'], failed_shots=failed)
-        return jsonify({'status': 'IMAGES_GENERATED', 'total': len(state['shots']), 'failed': failed})
+            # 同场景所有镜头共享关键帧
+            if keyframe_path and os.path.exists(keyframe_path):
+                for shot in group:
+                    shot['image_path'] = keyframe_path
+
+        _update_state(session_id, 'IMAGES_GENERATED', shots=state['shots'],
+                       failed_shots=failed, scene_groups=list(scene_groups.keys()))
+        return jsonify({
+            'status': 'IMAGES_GENERATED',
+            'total': len(state['shots']),
+            'scenes': len(scene_groups),
+            'failed': failed
+        })
 
     except Exception as e:
         logger.error(f"图片生成失败: {str(e)}")
