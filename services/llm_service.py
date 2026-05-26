@@ -216,22 +216,36 @@ SHOT_DESIGN_AUTO_USER = """=== 剧本分析报告 ===
 BIBLE_SYSTEM = """你是影视美术指导。分析所有分镜，输出"视觉圣经"确保全片视觉一致。
 若提供了 CHARACTER_SUMMARY（角色身份证），必须逐字复制，不得改写。
 
-输出JSON:
-{"global_style":"2-3句: 色温+主色调+光线质量",
- "characters":{"角色名":"若CHARACTER_SUMMARY已提供则逐字复制，否则写50-80词精确外貌"},
- "locations":{"场景名":"30-50词: 空间布局+标志道具+光线色调"},
- "shot_connections":["SC01->SC02 的衔接说明"]}
+=== 角色外貌模板（枚举格式，逗号分隔） ===
+"年龄,性别,身高,体型,发色,上装(色/款/质),下装,鞋,配饰"
+例: "30岁,男,178cm,瘦高,黑色短发,白色棉质衬衫,深蓝牛仔裤,棕色皮鞋,银框眼镜"
+
+=== 场景模板（3个字段，不可省略） ===
+每个场景必须包含:
+- layout: 空间大小+道具位置+标志物（30-50词英文）
+  例: "Modern office lobby, 8x10m, reception desk at center back, floor-to-ceiling windows on left wall, marble floor"
+- lighting: 主光方向+色温+光比（固定格式）
+  例: "Key light from window-left at 45°, 5600K daylight, fill from right bounce, ratio 4:1"
+- color_palette: 3-4色 英文
+  例: "warm beige, deep navy, sage green, brass accent"
+
+=== 输出JSON ===
+{{"global_style":"色温+主色调+光线质量（2-3句英文）",
+ "characters":{{"角色名":{{"appearance":"枚举模板","anchor_shot":"首次出场镜头ID"}}}},
+ "locations":{{"场景名":{{"layout":"布局","lighting":"灯光","color_palette":"配色"}}}},
+ "shot_connections":["SC01→SC02: 过渡说明（约15字）"]}}
 只输出JSON。"""
 
 BIBLE_USER = """风格前缀: {style_prefix}
 
-=== CHARACTER_SUMMARY（角色身份证，不可修改） ===
+=== CHARACTER_SUMMARY（角色身份证，按枚举模板格式，不可修改） ===
 {character_summary}
 
 分镜数据:
 {shots_json}
 
-生成视觉圣经。角色描述从 CHARACTER_SUMMARY 逐字复制。"""
+按模板格式生成视觉圣经。角色外貌从 CHARACTER_SUMMARY 逐字复制。
+每个场景必须包含 layout / lighting / color_palette 三个字段。"""
 
 
 # ================================================================
@@ -327,10 +341,12 @@ PROMPT_GEN_USER = """=== 视觉圣经 ===
 === 情绪弧线 ===
 {emotion_arc}
 
-=== 分镜列表（含叙事链、相机指令、时长） ===
+=== 分镜列表（含叙事链、相机指令、时长、场景模板） ===
 {shots_with_context}
 
 为每个镜头生成 image_prompt(英文) 和 video_prompt(中文)。
+
+image_prompt 场景部分: 必须从 location_layout / location_lighting / location_colors 逐字复制，不得改写。
 严格使用 {{{{CHAR}}:角色名}} 占位符。
 video_prompt: 中文 50-80字，5段(主体/动作/镜头/风格/禁止)缺一不可，禁止词根据运镜从映射表选取。"""
 
@@ -491,7 +507,10 @@ def generate_prompts(shots, config, character_summary=None):
             'axis_note': s.get('axis_note', ''),
             'character_master_refs': char_refs,
             'narrative_chain': f"前: {prev_desc} → 当前: {s.get('action_summary','')[:100]} → 后: {next_desc}",
-            'on_screen_text': s.get('on_screen_text', '')
+            'on_screen_text': s.get('on_screen_text', ''),
+            'location_layout': bible.get('locations', {}).get(s.get('location', ''), {}).get('layout', ''),
+            'location_lighting': bible.get('locations', {}).get(s.get('location', ''), {}).get('lighting', ''),
+            'location_colors': bible.get('locations', {}).get(s.get('location', ''), {}).get('color_palette', '')
         })
     shots_ctx_json = json.dumps(shots_with_context, ensure_ascii=False, indent=2)
 
