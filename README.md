@@ -35,21 +35,21 @@
 
 ```
 simple_webpage/
-├── app.py                  # Flask 入口 + 路由
-├── config.py               # 集中配置（密钥、模型、常量）
+├── app.py                  # Flask 入口 + 6步流水线路由
+├── config.py               # 配置中心（密钥/模型/风格/镜头）
+├── logger_config.py        # 日志系统（双文件输出 + 轮转）
 ├── services/
-│   ├── document_parser.py  # 文档解析（TXT/DOCX/PDF/PPTX）
-│   ├── prompt_generator.py # AI 视频 prompt 生成
-│   └── video_generator.py  # Seedance API 视频生成
-├── logger_config.py        # 日志系统
-├── index.html              # 前端页面
-├── styles.css              # 样式表
-├── script.js               # 前端脚本
-├── requirements.txt        # Python 依赖
-├── api/index.py            # Vercel Serverless 入口
-├── vercel.json             # Vercel 部署配置
-├── uploads/                # 上传文件目录
-└── outputs/                # 输出视频目录
+│   ├── llm_service.py      # DeepSeek V4 Pro 分镜设计 + Prompt生成
+│   ├── image_generator.py  # Seedream 5.0 Lite 文生图
+│   ├── composer.py         # ffmpeg 视频合成（字幕/混音/拼接）
+│   ├── document_parser.py  # .txt / .docx 文档解析
+│   └── tts_service.py      # Edge TTS 中文语音合成
+├── index.html / script.js / styles.css  # 前端
+├── api/index.py / vercel.json           # Vercel 部署
+├── requirements.txt
+├── uploads/                # 上传文件（gitignore）
+├── outputs/                # 生成视频（gitignore）
+└── logs/                   # 运行日志（gitignore）
 ```
 
 ## 安装与运行
