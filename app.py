@@ -80,7 +80,8 @@ def login():
     token = request.form.get('token', '')
     if token == ACCESS_TOKEN:
         resp = redirect('/')
-        resp.set_cookie('auth', token, max_age=60*60*24*30, httponly=True)
+        resp.set_cookie('auth', token, max_age=60*60*24*30,
+                httponly=True, secure=True, samesite='Lax')
         return resp
     return _login_page('密码错误')
 
