@@ -318,13 +318,31 @@ pan / tracking: no vertical drift, no speed variation, no rolling shutter
 === 通用禁止词（所有 video_prompt 必须包含） ===
 no face drift, no limb warp, no texture flicker, no added objects, no color shift
 
-=== image_prompt 格式 (英文 250-400词，给 Seedream) ===
-[全局风格: 色温+主色调+光线质量]
-[场景: 从视觉圣经逐字复制]
-{CHAR:角色名1} {CHAR:角色名2}
-[构图: camera_hint + 情绪灯光]
-[静态状态: standing/holding/positioned/sitting — 这是视频的起始帧]
-[品质: high quality, consistent character design, identical appearance, detailed textures, clean background, cinematic lighting]
+=== image_prompt 格式 (英文 200-300词，给 Seedream，7段式) ===
+
+词序=权重，最重要元素放最前。每段之间用句号分隔，形成自然段落。
+禁止使用 "high quality, masterpiece, 8K, ultra-detailed" 等空泛修饰词。
+
+1. [主体] 角色身份证 + 姿势 + 画面位置（权重最高，放最前）
+   例: "Character Model [主角A]: male,30,178cm,slim,black short hair,white cotton shirt,dark blue jeans,brown leather shoes. Standing at counter left, holding a document, eyes fixed on paper."
+
+2. [姿态] 静态起始帧。写镜头开始瞬间的定格状态。
+   例: "Frozen mid-gesture, right hand extended toward document, body still, left hand resting on counter."
+
+3. [场景] 从分镜数据逐字复制 location_layout + location_colors。不得改写。
+   例: "{location_layout}. Color palette: {location_colors}."
+
+4. [构图] camera_hint + 焦距 + 景深。用摄影术语。
+   例: "Medium shot, waist-up framing, 85mm lens, shallow depth of field, bokeh background."
+
+5. [光影] 从分镜数据逐字复制 location_lighting。不得改写。
+   例: "{location_lighting}."
+
+6. [风格] style_prefix + global_style
+   例: "{style_prefix}. {global_style}."
+
+7. [品质] 精简一行
+   "sharp focus, consistent character design, clean background, cinematic lighting."
 
 只输出JSON。"""
 
@@ -346,7 +364,9 @@ PROMPT_GEN_USER = """=== 视觉圣经 ===
 
 为每个镜头生成 image_prompt(英文) 和 video_prompt(中文)。
 
-image_prompt 场景部分: 必须从 location_layout / location_lighting / location_colors 逐字复制，不得改写。
+image_prompt: 英文 200-300词，7段式（主体/姿态/场景/构图/光影/风格/品质）。
+  第1段(主体)放最重要元素，词序=权重。第3、5段从分镜数据逐字复制，不得改写。
+  禁止使用 "high quality, masterpiece, 8K, ultra-detailed" 空泛词。
 严格使用 {{{{CHAR}}:角色名}} 占位符。
 video_prompt: 中文 50-80字，5段(主体/动作/镜头/风格/禁止)缺一不可，禁止词根据运镜从映射表选取。"""
 
