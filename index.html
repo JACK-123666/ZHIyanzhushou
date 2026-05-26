@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>智演助手 1.0 - 分镜脚本视频生成平台</title>
+    <title>智演助手 1.5 - 文档一键成片</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -11,8 +11,8 @@
     <nav class="navbar">
         <div class="container">
             <div class="logo">
-                <span class="logo-icon">🎬</span>
-                <span class="logo-text">智演助手 1.0</span>
+                <span class="logo-dot"></span>
+                <span class="logo-text">智演助手 1.5</span>
             </div>
             <ul class="nav-links">
                 <li><a href="#home">首页</a></li>
@@ -25,11 +25,15 @@
     <header id="home" class="hero">
         <div class="container">
             <div class="hero-content">
-                <h1>分镜脚本 → 视频，全自动</h1>
-                <p>上传分镜脚本文档，AI 自动解析、文生图、图生视频、配音合成，一键输出完整视频</p>
+                <div class="hero-badge">
+                    <span class="hero-badge-dot"></span>
+                    AI 驱动 · 全自动视频生成
+                </div>
+                <h1>文档 <span class="accent">→</span> 视频<br>一键成片</h1>
+                <p>DeepSeek 剧本解析 + Seedream 出图 + Seedance 生视频，角色锚定确保人物连贯，多线程并行加速</p>
                 <button class="cta-button" id="ctaButton">
-                    <span class="button-text">开始创作</span>
-                    <span class="button-icon">→</span>
+                    开始创作
+                    <svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
                 </button>
             </div>
         </div>
@@ -39,86 +43,121 @@
         <div class="container">
             <div class="section-header">
                 <h2>工作台</h2>
-                <p class="section-subtitle">上传分镜脚本文档（.docx / .txt），配置参数，一键生成</p>
+                <p class="section-subtitle">上传文档（.docx / .txt），配置参数，一键生成</p>
             </div>
 
             <div class="upload-container">
                 <div class="upload-area" id="uploadArea">
-                    <div class="upload-icon">📁</div>
-                    <h3>拖拽分镜脚本文件到此处或点击上传</h3>
+                    <svg class="upload-icon-svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                    <h3>拖拽文件到此处或点击上传</h3>
                     <p class="upload-hint">支持 .docx（Word表格）或 .txt（纯文本）</p>
                     <input type="file" id="fileInput" class="file-input" accept=".docx,.txt" hidden>
-                    <button class="upload-button"><span class="button-text">选择文件</span></button>
+                    <button class="upload-button">选择文件</button>
                 </div>
 
                 <div class="file-info" id="fileInfo" style="display: none;">
-                    <div class="file-icon">📄</div>
+                    <svg class="file-icon-svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                     <div class="file-details">
                         <h3 id="fileName">文件名</h3>
                         <p id="fileSize">文件大小</p>
                     </div>
-                    <button class="remove-file" id="removeFile" title="移除文件">✕</button>
+                    <button class="remove-file" id="removeFile" title="移除文件">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
                 </div>
 
                 <div class="config-panel" id="configPanel" style="display: none;">
-                    <div class="options-header"><h3>生成配置</h3></div>
-                    <div class="options-grid">
-                        <div class="option-group">
-                            <label>🎨 视觉风格</label>
-                            <select id="styleTemplate" class="modern-select">
-                                <option value="3d_cartoon">3D卡通</option>
-                                <option value="2d_flat">2D扁平</option>
-                                <option value="semi_realistic">写实简化</option>
-                                <option value="pencil_sketch">素描线稿</option>
-                            </select>
-                        </div>
-                        <div class="option-group">
-                            <label>⏱️ 时长模式</label>
-                            <select id="durationMode" class="modern-select">
-                                <option value="uniform">统一5秒</option>
-                                <option value="strict">严格按脚本</option>
-                                <option value="auto_split">自动拆分(>8s)</option>
-                            </select>
-                        </div>
-                        <div class="option-group">
-                            <label>👤 角色一致性</label>
-                            <select id="consistencyStrategy" class="modern-select">
-                                <option value="generic">通用无面孔</option>
-                                <option value="reference">参考图驱动</option>
-                                <option value="random">随机生成</option>
-                            </select>
-                        </div>
-                        <div class="option-group">
-                            <label>📐 分辨率</label>
-                            <select id="resolution" class="modern-select">
-                                <option value="1920x1080">1920x1080 (16:9)</option>
-                                <option value="1024x1024">1024x1024 (1:1)</option>
-                                <option value="1080x1920">1080x1920 (9:16)</option>
-                            </select>
-                        </div>
-                        <div class="option-group">
-                            <label>💬 自动字幕</label>
-                            <select id="autoSubtitle" class="modern-select">
-                                <option value="yes">是</option>
-                                <option value="no">否</option>
-                            </select>
-                        </div>
-                        <div class="option-group">
-                            <label>🔊 自动音效</label>
-                            <select id="autoSfx" class="modern-select">
-                                <option value="no">否</option>
-                                <option value="yes">是</option>
-                            </select>
-                        </div>
-                        <div class="option-group">
-                            <label>🎵 BGM音量</label>
-                            <input type="range" id="bgmVolume" min="0" max="100" value="20" class="volume-slider">
-                            <span id="bgmVolumeLabel">20%</span>
+                    <!-- 模式切换 Tab -->
+                    <div class="mode-tabs">
+                        <button class="mode-tab active" data-mode="semi_auto" id="tabSemi">Pro</button>
+                        <button class="mode-tab" data-mode="auto" id="tabAuto">全自动</button>
+                    </div>
+
+                    <!-- 半自动：现有配置项 -->
+                    <div class="config-panel-inner" id="configSemi">
+                        <div class="options-header"><h3>生成配置</h3></div>
+                        <div class="options-grid">
+                            <div class="option-group">
+                                <label>视觉风格</label>
+                                <select id="styleTemplate" class="modern-select">
+                                    <option value="3d_cartoon">3D卡通</option>
+                                    <option value="2d_flat">2D扁平</option>
+                                    <option value="semi_realistic">写实简化</option>
+                                    <option value="pencil_sketch">素描线稿</option>
+                                </select>
+                            </div>
+                            <div class="option-group">
+                                <label>时长模式</label>
+                                <select id="durationMode" class="modern-select">
+                                    <option value="ai_design">智能分配（推荐）</option>
+                                    <option value="uniform">统一5秒</option>
+                                    <option value="auto_split">长镜拆分</option>
+                                </select>
+                            </div>
+                            <div class="option-group">
+                                <label>角色一致性</label>
+                                <div class="info-badge">角色锚定</div>
+                                <span class="option-hint">自动提取 + 硬约束注入</span>
+                            </div>
+                            <div class="option-group">
+                                <label>视频画质</label>
+                                <select id="videoQuality" class="modern-select">
+                                    <option value="480p">480p 标准（省钱）</option>
+                                    <option value="720p">720p 高清</option>
+                                </select>
+                            </div>
+                            <div class="option-group">
+                                <label>图片分辨率</label>
+                                <select id="resolution" class="modern-select">
+                                    <option value="1920x1080">1920x1080 (16:9)</option>
+                                    <option value="1024x1024">1024x1024 (1:1)</option>
+                                    <option value="1080x1920">1080x1920 (9:16)</option>
+                                </select>
+                            </div>
+                            <div class="option-group">
+                                <label>自动字幕</label>
+                                <select id="autoSubtitle" class="modern-select">
+                                    <option value="yes">是</option>
+                                    <option value="no">否</option>
+                                </select>
+                            </div>
+                            <div class="option-group">
+                                <label>自动音效</label>
+                                <select id="autoSfx" class="modern-select">
+                                    <option value="no">否</option>
+                                    <option value="yes">是</option>
+                                </select>
+                            </div>
+                            <div class="option-group">
+                                <label>原视频音量</label>
+                                <input type="range" id="bgmVolume" min="0" max="100" value="20" class="volume-slider">
+                                <span id="bgmVolumeLabel">20%</span>
+                            </div>
                         </div>
                     </div>
+
+                    <!-- 全自动：仅选择总时长 -->
+                    <div class="config-panel-inner" id="configAuto" style="display:none">
+                        <div class="options-header"><h3>全自动生成</h3></div>
+                        <p style="text-align:center;color:var(--text-secondary);margin-bottom:1rem">
+                            AI 通读文档，自主设计分镜、风格、运镜、节奏
+                        </p>
+                        <div class="options-grid" style="max-width:300px;margin:0 auto">
+                            <div class="option-group">
+                                <label>视频总时长</label>
+                                <select id="totalDuration" class="modern-select">
+                                    <option value="auto">AI 自主决定</option>
+                                    <option value="short">1 分钟</option>
+                                    <option value="medium">3 分钟</option>
+                                    <option value="long">5 分钟</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
                     <button class="generate-button" id="generateButton">
-                        <span class="button-icon">🚀</span>
-                        <span class="button-text">开始生成</span>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                        开始生成
                     </button>
                 </div>
 
@@ -128,18 +167,27 @@
                         <p id="progressText">正在上传文件</p>
                     </div>
                     <div class="pipeline-steps">
-                        <div class="pipeline-step" id="pstep1"><span class="pstep-icon">📤</span><span>上传</span></div>
-                        <div class="pipeline-step" id="pstep2"><span class="pstep-icon">📝</span><span>解析</span></div>
-                        <div class="pipeline-step" id="pstep3"><span class="pstep-icon">💡</span><span>Prompt</span></div>
-                        <div class="pipeline-step" id="pstep4"><span class="pstep-icon">🖼️</span><span>图片</span></div>
-                        <div class="pipeline-step" id="pstep5"><span class="pstep-icon">🎬</span><span>视频</span></div>
-                        <div class="pipeline-step" id="pstep6"><span class="pstep-icon">✅</span><span>合成</span></div>
+                        <div class="pipeline-step" id="pstep1"><span class="pstep-icon">1</span><span>上传</span></div>
+                        <div class="pipeline-step" id="pstep2"><span class="pstep-icon">2</span><span>分镜</span></div>
+                        <div class="pipeline-step" id="pstep3"><span class="pstep-icon">3</span><span>Prompt</span></div>
+                        <div class="pipeline-step" id="pstep4"><span class="pstep-icon">4</span><span>出图</span></div>
+                        <div class="pipeline-step" id="pstep5"><span class="pstep-icon">5</span><span>视频</span></div>
+                        <div class="pipeline-step" id="pstep6"><span class="pstep-icon">6</span><span>合成</span></div>
+                    </div>
+                    <div class="pipeline-stats" id="pipelineStats" style="display:none;">
+                        <div class="stat-chip" id="statShots"><span class="chip-val">-</span><span class="chip-label">镜头</span></div>
+                        <div class="stat-chip" id="statScenes"><span class="chip-val">-</span><span class="chip-label">场景</span></div>
+                        <div class="stat-chip" id="statChars"><span class="chip-val">-</span><span class="chip-label">角色</span></div>
+                    </div>
+                    <div class="shots-preview" id="shotsPreview" style="display:none;">
+                        <h4 class="shots-preview-title">AI 分镜设计结果</h4>
+                        <div class="shots-list" id="shotsList"></div>
                     </div>
                 </div>
 
                 <div class="video-result" id="videoResult" style="display: none;">
                     <div class="result-header">
-                        <h3>🎉 视频生成完成！</h3>
+                        <h3>视频生成完成</h3>
                     </div>
                     <div class="video-container">
                         <video controls id="resultVideo" preload="metadata">
@@ -148,10 +196,12 @@
                     </div>
                     <div class="video-actions">
                         <button class="action-button download-button" id="downloadBtn">
-                            <span>⬇️ 下载视频</span>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                            下载视频
                         </button>
                         <button class="action-button new-video-button" id="newVideoBtn">
-                            <span>🔄 生成新视频</span>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                            生成新视频
                         </button>
                     </div>
                 </div>
@@ -163,18 +213,20 @@
         <div class="container">
             <div class="about-content">
                 <div class="about-text">
-                    <h2>关于智演助手 1.0</h2>
-                    <p>基于 DeepSeek V4 + 豆包 Seedream + Seedance 2.0 Flash 的全自动视频生成流水线。上传分镜脚本，AI 自动完成从解析到合成的全部工作。</p>
+                    <h2>关于智演助手 1.5</h2>
+                    <p>DeepSeek V4 + Seedream 5.0 + Seedance 2.0 全自动视频流水线。角色锚定确保人物跨镜头一致、场景级关键帧共享、多线程并行提速。</p>
                 </div>
                 <div class="about-stats">
                     <div class="stat-card"><div class="stat-number">6</div><div class="stat-label">流水线阶段</div></div>
                     <div class="stat-card"><div class="stat-number">3</div><div class="stat-label">AI 模型</div></div>
+                    <div class="stat-card"><div class="stat-number">8</div><div class="stat-label">镜头语言</div></div>
+                    <div class="stat-card"><div class="stat-number">5x</div><div class="stat-label">并行加速</div></div>
                 </div>
             </div>
         </div>
     </section>
 
-    <footer class="footer"><div class="container"><p>&copy; 2026 智演助手 1.0</p></div></footer>
+    <footer class="footer"><div class="container"><p>&copy; 2026 智演助手 1.5 · DeepSeek + Seedream + Seedance</p></div></footer>
     <script src="script.js"></script>
 </body>
 </html>

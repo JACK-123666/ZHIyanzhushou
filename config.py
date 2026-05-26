@@ -1,86 +1,125 @@
+"""
+智演助手 1.5 — 配置中心
+密钥 | 模型端点 | 风格模板 | 镜头语言映射 | 重试策略
+"""
+
 import os
-from dotenv import load_dotenv
 
-load_dotenv()
+# --- API 密钥 ---
 
-# --- 密钥 ---
-ARK_API_KEY = os.environ.get('ARK_API_KEY', '')
-DEEPSEEK_API_KEY = os.environ.get('DEEPSEEK_API_KEY', '')
-DEEPSEEK_BASE_URL = os.environ.get('DEEPSEEK_BASE_URL', 'https://api.deepseek.com/v1')
+ARK_API_KEY = os.environ.get('ARK_API_KEY', '')          # 豆包 ARK（Seedream+Seedance 共用）
+DEEPSEEK_API_KEY = os.environ.get('DEEPSEEK_API_KEY', '')  # DeepSeek（分镜+Prompt）
+DEEPSEEK_BASE_URL = os.environ.get('DEEPSEEK_BASE_URL', 'https://api.deepseek.com')
 
 # --- 上传限制 ---
-MAX_UPLOAD_SIZE = 50 * 1024 * 1024
-MAX_CONTENT_LENGTH = 100000
+
+MAX_UPLOAD_SIZE = 100 * 1024 * 1024  # 100MB
+MAX_CONTENT_LENGTH = 200000          # 文档截断：20万字
 ALLOWED_DOC_EXTENSIONS = {'.docx', '.txt'}
 
-# --- 前端配置选项定义 ---
+# --- 视觉风格（前端下拉 → 英文 prompt 前缀） ---
+
 STYLE_TEMPLATES = {
-    '3d_cartoon': {
-        'label': '3D卡通',
-        'prompt': '3D animation, cartoon shading, vibrant colors, non-photorealistic rendering, Pixar-style'
-    },
-    '2d_flat': {
-        'label': '2D扁平',
-        'prompt': '2D flat vector style, clean outlines, uniform lighting, minimalist flat design'
-    },
-    'semi_realistic': {
-        'label': '写实简化',
-        'prompt': 'semi-realistic, soft lighting, minimal details, no photo-realism, stylized realism'
-    },
-    'pencil_sketch': {
-        'label': '素描线稿',
-        'prompt': 'pencil sketch, black and white, rough lines, artistic hand-drawn style'
-    }
+    '3d_cartoon':   {'label': '3D卡通',  'prompt': '3D animation, Pixar-style'},
+    '2d_flat':      {'label': '2D扁平',  'prompt': '2D flat vector style, minimalist'},
+    'semi_realistic': {'label': '写实简化', 'prompt': 'semi-realistic, stylized realism'},
+    'pencil_sketch':  {'label': '素描线稿', 'prompt': 'pencil sketch, black and white'},
 }
+
+# --- 时长模式 ---
 
 DURATION_MODES = {
-    'strict': {'label': '严格按脚本', 'default_seconds': 5},
-    'uniform': {'label': '统一5秒', 'default_seconds': 5},
-    'auto_split': {'label': '自动拆分(>8s)', 'default_seconds': 8, 'max_seconds': 8}
+    'ai_design':  {'label': 'AI智能分配（推荐）', 'default_seconds': 5},
+    'uniform':    {'label': '统一5秒',           'default_seconds': 5},
+    'auto_split': {'label': '自动拆分(>8s)',     'default_seconds': 8, 'max_seconds': 8},
 }
 
-CONSISTENCY_STRATEGIES = {
-    'generic': {'label': '通用无面孔模型', 'value': 'generic'},
-    'reference': {'label': '参考图驱动', 'value': 'reference'},
-    'random': {'label': '随机生成', 'value': 'random'}
-}
+# --- 图片分辨率（Seedream 出图尺寸） ---
 
 RESOLUTIONS = {
     '1920x1080': {'label': '1920x1080 (16:9)', 'width': 1920, 'height': 1080, 'ratio': '16:9', 'size': '2K'},
-    '1024x1024': {'label': '1024x1024 (1:1)', 'width': 1024, 'height': 1024, 'ratio': '1:1', 'size': '1K'},
-    '1080x1920': {'label': '1080x1920 (9:16)', 'width': 1080, 'height': 1920, 'ratio': '9:16', 'size': '2K'}
+    '1024x1024': {'label': '1024x1024 (1:1)',  'width': 1024, 'height': 1024, 'ratio': '1:1',  'size': '1K'},
+    '1080x1920': {'label': '1080x1920 (9:16)', 'width': 1080, 'height': 1920, 'ratio': '9:16', 'size': '2K'},
 }
 
-# --- 模型配置 ---
+# --- AI 模型配置 ---
+
 AI_MODELS = {
     'deepseek': {
-        'name': 'DeepSeek V4',
+        'name': 'DeepSeek V4 Pro [1M]',
         'api_url': f"{DEEPSEEK_BASE_URL}/chat/completions",
         'api_key': DEEPSEEK_API_KEY,
-        'model': 'deepseek-chat'
+        'model': 'deepseek-v4-pro',
     },
     'seedream': {
-        'name': 'Seedream 5.0 Lite (豆包文生图)',
+        'name': 'Seedream 5.0 Lite（文生图）',
         'api_url': 'https://ark.cn-beijing.volces.com/api/v3/images/generations',
         'api_key': ARK_API_KEY,
-        'model': os.environ.get('SEEDREAM_ENDPOINT', 'your_seedream_endpoint')
+        'model': os.environ.get('SEEDREAM_ENDPOINT', 'your_seedream_endpoint'),
     },
     'seedance': {
-        'name': 'Seedance 2.0 Fast (豆包图生视频)',
+        'name': 'Seedance 2.0 Fast（图生视频）',
         'api_url': 'https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks',
         'api_key': ARK_API_KEY,
-        'model': os.environ.get('SEEDANCE_ENDPOINT', 'your_seedance_endpoint')
-    }
+        'model': os.environ.get('SEEDANCE_ENDPOINT', 'your_seedance_endpoint'),
+    },
 }
 
-# --- 状态定义 ---
-PIPELINE_STATES = ['UPLOADED', 'PARSED', 'PROMPTS_READY', 'IMAGES_GENERATED', 'VIDEOS_GENERATED', 'COMPOSED']
+# --- 镜头语言：中文 → 英文构图指令（注入 image_prompt） ---
 
-# --- 重试配置 ---
+CAMERA_INSTRUCTIONS = {
+    # 景别
+    '建立远景': 'wide establishing shot, full environment, deep depth of field',
+    '中景':   'medium shot, waist-up framing, balanced composition',
+    '过肩OTS': 'over-the-shoulder shot, foreground character as soft frame',
+    '单人特写': 'tight close-up, face filling 60% of frame, shallow DOF, bokeh',
+    '插入特写': 'extreme close-up insert, single detail, razor-thin DOF',
+    '跟拍':   'tracking shot, camera follows subject, background parallax',
+    'POV':    'point-of-view shot, camera as character eyes, first-person',
+    '俯拍':   'high-angle shot looking down, characters appear vulnerable',
+    '仰拍':   'low-angle shot looking up, characters appear powerful',
+    '手持':   'handheld camera, organic shake, documentary realism',
+    '推近':   'dolly-in from medium to close-up, increasing dramatic intensity',
+    '拉远':   'dolly-out from subject, revealing environment, isolation feel',
+    # Seedance 8 种原生运动
+    'push-in':  'slow dolly push-in, smooth steady, no abrupt stops',
+    'pull-out': 'slow dolly pull-out, smooth steady retreat',
+    'pan':      'horizontal pan, smooth scan, no vertical drift',
+    'tracking': 'lateral tracking alongside subject, background parallax',
+    'orbit':    'orbital arc around subject, circular movement',
+    'crane':    'vertical crane rise/lower, smooth elevation change',
+    'static':   'fixed camera, locked tripod, intentional stillness',
+    'handheld': 'subtle organic instability, documentary immediacy',
+}
+
+# --- 流水线状态 & 重试 ---
+
+PIPELINE_STATES = ['UPLOADED', 'SHOTS_DESIGNED', 'PROMPTS_READY',
+                    'IMAGES_GENERATED', 'VIDEOS_GENERATED', 'COMPOSED']
+
 MAX_RETRIES = 3
 RETRY_BASE_DELAY = 5
 RETRY_MAX_DELAY = 30
 
 
-def get_model_config(model_key):
-    return AI_MODELS.get(model_key)
+# --- 全自动模式：固定配置（用户只选时长，其余系统接管） ---
+
+AUTO_MODE_DEFAULTS = {
+    'resolution': '1920x1080',
+    'video_quality': '480p',
+    'auto_subtitle': 'yes',
+    'auto_sfx': 'no',
+    'original_audio_level': 20,
+}
+
+# 总时长选项：0 = AI 自主决定
+AUTO_DURATION_OPTIONS = {
+    'auto':  {'label': 'AI 自主决定', 'seconds': 0},
+    'short': {'label': '1 分钟',     'seconds': 60},
+    'medium':{'label': '3 分钟',     'seconds': 180},
+    'long':  {'label': '5 分钟',     'seconds': 300},
+}
+
+
+def get_model_config(key):
+    return AI_MODELS.get(key)
