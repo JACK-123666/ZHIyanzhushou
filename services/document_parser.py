@@ -1,22 +1,17 @@
+"""文档解析 — .txt 纯文本 / .docx Word表格（优先提取表格）"""
+
 import os
 from config import MAX_CONTENT_LENGTH
 
 
 def parse_document(filepath):
-    """解析文档（.docx / .txt）"""
-    file_ext = os.path.splitext(filepath)[1].lower()
-
-    if file_ext == '.txt':
-        content = _parse_txt(filepath)
-    elif file_ext == '.docx':
-        content = _parse_docx(filepath)
-    else:
-        raise ValueError(f"不支持的文件格式: {file_ext}，仅支持 .docx / .txt")
-
-    if len(content) > MAX_CONTENT_LENGTH:
-        content = content[:MAX_CONTENT_LENGTH]
-
-    return content
+    ext = os.path.splitext(filepath)[1].lower()
+    content = _parse_txt(filepath) if ext == '.txt' else (
+        _parse_docx(filepath) if ext == '.docx' else ''
+    )
+    if not content:
+        raise ValueError(f"不支持的文件格式: {ext}")
+    return content[:MAX_CONTENT_LENGTH]  # 截断保护
 
 
 def _parse_txt(filepath):
@@ -25,19 +20,16 @@ def _parse_txt(filepath):
 
 
 def _parse_docx(filepath):
+    """优先提取表格（分镜脚本常以Word表格存在），无表格则读段落"""
     from docx import Document
     doc = Document(filepath)
 
-    # 优先提取表格内容（分镜脚本通常是表格格式）
     tables_text = []
     for table in doc.tables:
         for row in table.rows:
-            cells = [cell.text.strip() for cell in row.cells]
-            tables_text.append(' | '.join(cells))
-
+            tables_text.append(' | '.join(c.text.strip() for c in row.cells))
     if tables_text:
         return '\n'.join(tables_text)
 
-    # 无表格则提取段落
     paragraphs = [p.text for p in doc.paragraphs if p.text.strip()]
     return '\n'.join(paragraphs[:500])
