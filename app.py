@@ -576,6 +576,90 @@ def session_retry_failed(session_id):
     return jsonify({'status': 'RETRIED', 'retried': retried, 'still_failed': still})
 
 
+# =========================================================================
+# /rerun: 从指定步骤重跑流水线 (design / prompts / images)
+# =========================================================================
+
+@app.route('/api/session/<session_id>/rerun', methods=['POST'])
+def session_rerun(session_id):
+    """从指定步骤重跑流水线。from=design|prompts|images"""
+    state = _load_state(session_id)
+    if not state:
+        return jsonify({'error': 'Session 不存在'}), 404
+
+    from_step = request.args.get('from', 'images')
+    step_order = ['design', 'prompts', 'images']
+    if from_step not in step_order:
+        return jsonify({'error': '无效步骤，可选: {}。视频和合成请用 /videos 和 /compose 端点'.format(step_order)}), 400
+
+    start_idx = step_order.index(from_step)
+    results = {'rerun_from': from_step, 'steps_executed': []}
+
+    try:
+        for step in step_order[start_idx:]:
+            if step == 'design':
+                content = parse_document(state['filepath'])
+                result = design_shots_from_document(content, state['config'])
+                shots = result.get('shots', [])
+                dur_mode = state['config']['duration_mode']
+                for s in shots:
+                    orig = s.get('original_duration')
+                    s['final_duration'] = (5 if dur_mode == 'uniform'
+                        else (orig if orig and orig <= 8 else 8) if dur_mode == 'auto_split'
+                        else (orig or 5))
+                if state['config'].get('mode') == 'auto':
+                    directive = result.get('visual_style_directive', '')
+                    if directive:
+                        state['config']['visual_style_directive'] = directive
+                _update_state(session_id, 'SHOTS_DESIGNED', shots=shots,
+                    scene_map=result.get('scene_map', {}), title=result.get('title', ''),
+                    character_summary=result.get('character_summary', {}),
+                    global_tone=result.get('global_tone', ''), config=state['config'])
+                state = _load_state(session_id)
+                results['shots_count'] = len(shots)
+                results['steps_executed'].append('design')
+
+            elif step == 'prompts':
+                shots = state.get('shots', [])
+                if not shots:
+                    return jsonify({'error': '无分镜数据，请从 design 开始'}), 400
+                prompts = generate_prompts(shots, state['config'], state.get('character_summary'))
+                for s, p in zip(shots, prompts):
+                    s['image_prompt'] = p.get('image_prompt', '')
+                    s['video_prompt'] = p.get('video_prompt', '')
+                _update_state(session_id, 'PROMPTS_READY', shots=shots, prompts=prompts)
+                state = _load_state(session_id)
+                results['steps_executed'].append('prompts')
+
+            elif step == 'images':
+                shots = state.get('shots', [])
+                valid_shots = [s for s in shots if s.get('image_prompt') and len(s.get('image_prompt', '').strip()) >= 20]
+                failed_img = []
+                with ThreadPoolExecutor(max_workers=5) as pool:
+                    futs = {}
+                    for s in valid_shots:
+                        img_path = os.path.join(_session_dir(session_id), '{}.png'.format(s['id']))
+                        futs[pool.submit(generate_image, get_model_config('seedream'),
+                            s['image_prompt'], state['config'].get('resolution', '1920x1080'), img_path)] = s
+                    for f in as_completed(futs):
+                        s = futs[f]
+                        try:
+                            f.result()
+                            s['image_path'] = os.path.join(_session_dir(session_id), '{}.png'.format(s['id']))
+                        except Exception:
+                            failed_img.append(s['id'])
+                _update_state(session_id, 'IMAGES_GENERATED', shots=shots, failed_images=failed_img)
+                results['failed_images'] = len(failed_img)
+                results['steps_executed'].append('images')
+
+        results['status'] = _load_state(session_id).get('status', 'OK')
+        return jsonify(results)
+
+    except Exception as e:
+        logger.error('rerun 失败: {}'.format(str(e)))
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/session/<session_id>/download', methods=['GET'])
 def session_download(session_id):
     state = _load_state(session_id)
