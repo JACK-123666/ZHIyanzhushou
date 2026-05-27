@@ -122,7 +122,7 @@ def index():
 
 @app.route('/<path:filename>')
 def static_files(filename):
-    if filename in ('styles.css', 'script.js'):
+    if filename in ('styles.css', 'script.js') or filename.startswith('i18n/'):
         return send_from_directory('.', filename)
     return jsonify({'error': 'Not found'}), 404
 
@@ -178,8 +178,9 @@ def session_create():
             'bgm_enabled': request.form.get('bgm_enabled', 'no'),
             'bgm_volume': int(request.form.get('bgm_volume', 10)),
             'language': request.form.get('language', DEFAULT_LANGUAGE),
-            'tts_voice': request.form.get('tts_voice',
-                        LANGUAGES[DEFAULT_LANGUAGE]['tts_voice'])
+            'tts_voice': request.form.get('tts_voice') or
+                        LANGUAGES.get(request.form.get('language', DEFAULT_LANGUAGE),
+                                      LANGUAGES[DEFAULT_LANGUAGE])['tts_voice']
         }
 
     _save_state(session_id, {
