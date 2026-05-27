@@ -15,10 +15,16 @@
                 <span class="logo-text">智演助手 1.5</span>
             </div>
             <ul class="nav-links">
-                <li><a href="#home">首页</a></li>
-                <li><a href="#workspace">工作台</a></li>
-                <li><a href="#about">关于</a></li>
+                <li><a href="#home" data-i18n="nav_home">首页</a></li>
+                <li><a href="#workspace" data-i18n="nav_workspace">工作台</a></li>
+                <li><a href="#about" data-i18n="nav_about">关于</a></li>
             </ul>
+            <select id="langSwitcher" class="lang-switcher">
+                <option value="zh">中文</option>
+                <option value="en">English</option>
+                <option value="ja">日本語</option>
+                <option value="ko">한국어</option>
+            </select>
         </div>
     </nav>
 
@@ -27,12 +33,12 @@
             <div class="hero-content">
                 <div class="hero-badge">
                     <span class="hero-badge-dot"></span>
-                    AI 驱动 · 全自动视频生成
+                    <span data-i18n="hero_badge">AI 驱动 · 全自动视频生成</span>
                 </div>
-                <h1>文档 <span class="accent">→</span> 视频<br>一键成片</h1>
-                <p>DeepSeek 剧本解析 + Seedream 出图 + Seedance 生视频，角色锚定确保人物连贯，多线程并行加速</p>
+                <h1><span data-i18n="hero_title_line1">文档</span> <span class="accent">→</span> <span data-i18n="hero_title_line2">视频</span><br><span data-i18n="hero_title_line3">一键成片</span></h1>
+                <p data-i18n="hero_subtitle">DeepSeek 剧本解析 + Seedream 出图 + Seedance 生视频，角色锚定确保人物连贯，多线程并行加速</p>
                 <button class="cta-button" id="ctaButton">
-                    开始创作
+                    <span data-i18n="hero_cta">开始创作</span>
                     <svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
                 </button>
             </div>
@@ -42,17 +48,17 @@
     <section id="workspace" class="upload-section">
         <div class="container">
             <div class="section-header">
-                <h2>工作台</h2>
-                <p class="section-subtitle">上传文档（.docx / .txt），配置参数，一键生成</p>
+                <h2 data-i18n="section_title">工作台</h2>
+                <p class="section-subtitle" data-i18n="section_subtitle">上传文档（.docx / .txt），配置参数，一键生成</p>
             </div>
 
             <div class="upload-container">
                 <div class="upload-area" id="uploadArea">
                     <svg class="upload-icon-svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                    <h3>拖拽文件到此处或点击上传</h3>
-                    <p class="upload-hint">支持 .docx（Word表格）或 .txt（纯文本）</p>
+                    <h3 data-i18n="upload_title">拖拽文件到此处或点击上传</h3>
+                    <p class="upload-hint" data-i18n="upload_hint">支持 .docx（Word表格）或 .txt（纯文本）</p>
                     <input type="file" id="fileInput" class="file-input" accept=".docx,.txt" hidden>
-                    <button class="upload-button">选择文件</button>
+                    <button class="upload-button" data-i18n="upload_button">选择文件</button>
                 </div>
 
                 <div class="file-info" id="fileInfo" style="display: none;">

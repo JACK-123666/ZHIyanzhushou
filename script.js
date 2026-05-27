@@ -3,6 +3,34 @@ var FORMAT_SIZES = ['Bytes', 'KB', 'MB', 'GB'];
 var PIPELINE_STEPS = ['UPLOADED', 'SHOTS_DESIGNED', 'PROMPTS_READY', 'IMAGES_GENERATED', 'VIDEOS_GENERATED', 'COMPOSED'];
 var currentSessionId = null;
 var currentMode = 'semi_auto';
+var i18nData = {};
+var currentLang = 'zh';
+
+function t(key) {
+    return (i18nData[currentLang] && i18nData[currentLang][key]) || key;
+}
+
+async function setLanguage(lang) {
+    currentLang = lang;
+    if (!i18nData[lang]) {
+        try {
+            var resp = await fetch('i18n/' + lang + '.json');
+            i18nData[lang] = await resp.json();
+        } catch (e) { return; }
+    }
+    localStorage.setItem('lang', lang);
+    // 更新所有 data-i18n 元素
+    document.querySelectorAll('[data-i18n]').forEach(function(el) {
+        var key = el.getAttribute('data-i18n');
+        if (i18nData[lang][key]) el.textContent = i18nData[lang][key];
+    });
+    // 更新文档语言属性
+    document.documentElement.lang = lang === 'zh' ? 'zh-CN' : lang === 'ja' ? 'ja-JP' : lang === 'ko' ? 'ko-KR' : 'en-US';
+    // 更新select标签的语言特定选项
+    if (lang !== 'zh') {
+        document.querySelector('option[value="ai_design"]').textContent = lang === 'en' ? 'Smart (Rec)' : lang === 'ja' ? 'スマート(推奨)' : '스마트(권장)';
+    }
+}
 
 function showToast(msg, type) {
     type = type || 'info';
@@ -63,6 +91,14 @@ var downloadBtn = document.getElementById('downloadBtn');
 var newVideoBtn = document.getElementById('newVideoBtn');
 
 document.addEventListener('DOMContentLoaded', function () {
+    // 多语言初始化
+    var savedLang = localStorage.getItem('lang') || (navigator.language.startsWith('zh') ? 'zh' : navigator.language.startsWith('ja') ? 'ja' : navigator.language.startsWith('ko') ? 'ko' : 'en');
+    document.getElementById('langSwitcher').value = savedLang;
+    setLanguage(savedLang);
+    document.getElementById('langSwitcher').addEventListener('change', function () {
+        setLanguage(this.value);
+    });
+
     var cta = document.getElementById('ctaButton');
     if (cta) cta.addEventListener('click', function () {
         document.querySelector('#workspace').scrollIntoView({ behavior: 'smooth' });

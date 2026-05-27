@@ -113,6 +113,15 @@ body {
 }
 .nav-links a:hover { color: var(--color-foreground); }
 
+.lang-switcher {
+    padding: 4px 8px; border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm); background: var(--color-background);
+    color: var(--color-secondary); font-size: .8rem;
+    font-family: inherit; cursor: pointer; outline: none;
+    transition: border-color var(--duration-fast) var(--ease-out);
+}
+.lang-switcher:focus { border-color: var(--color-accent); }
+
 /* ═══════════════════════════════════════════════════════════════
    HERO — large typography, lots of whitespace
    ═══════════════════════════════════════════════════════════════ */
