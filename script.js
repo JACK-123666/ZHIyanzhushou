@@ -1,7 +1,8 @@
 var ALLOWED_EXTENSIONS = ['.docx', '.txt'];
 var FORMAT_SIZES = ['Bytes', 'KB', 'MB', 'GB'];
-var PIPELINE_STEPS = ['UPLOADED', 'PARSED', 'PROMPTS_READY', 'IMAGES_GENERATED', 'VIDEOS_GENERATED', 'COMPOSED'];
+var PIPELINE_STEPS = ['UPLOADED', 'SHOTS_DESIGNED', 'PROMPTS_READY', 'IMAGES_GENERATED', 'VIDEOS_GENERATED', 'COMPOSED'];
 var currentSessionId = null;
+var currentMode = 'semi_auto';
 
 function showToast(msg, type) {
     type = type || 'info';
@@ -11,6 +12,26 @@ function showToast(msg, type) {
     t.textContent = msg;
     c.appendChild(t);
     setTimeout(function () { t.remove(); }, 3000);
+}
+
+function switchMode(mode) {
+    currentMode = mode;
+    var tabSemi = document.getElementById('tabSemi');
+    var tabAuto = document.getElementById('tabAuto');
+    var configSemi = document.getElementById('configSemi');
+    var configAuto = document.getElementById('configAuto');
+
+    if (mode === 'auto') {
+        tabSemi.className = 'mode-tab';
+        tabAuto.className = 'mode-tab active';
+        configSemi.style.display = 'none';
+        configAuto.style.display = 'block';
+    } else {
+        tabSemi.className = 'mode-tab active';
+        tabAuto.className = 'mode-tab';
+        configSemi.style.display = 'block';
+        configAuto.style.display = 'none';
+    }
 }
 
 function formatFileSize(bytes) {
@@ -32,6 +53,10 @@ var generateButton = document.getElementById('generateButton');
 var progressContainer = document.getElementById('progressContainer');
 var progressTitle = document.getElementById('progressTitle');
 var progressText = document.getElementById('progressText');
+var pipelineStats = document.getElementById('pipelineStats');
+var statShots = document.getElementById('statShots');
+var statScenes = document.getElementById('statScenes');
+var statChars = document.getElementById('statChars');
 var videoResult = document.getElementById('videoResult');
 var resultVideo = document.getElementById('resultVideo');
 var downloadBtn = document.getElementById('downloadBtn');
@@ -73,6 +98,18 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('bgmVolume').addEventListener('input', function () {
         document.getElementById('bgmVolumeLabel').textContent = this.value + '%';
     });
+
+    // 模式切换 Tab
+    document.getElementById('tabSemi').addEventListener('click', function () { switchMode('semi_auto'); });
+    document.getElementById('tabAuto').addEventListener('click', function () { switchMode('auto'); });
+
+    // BGM controls
+    document.getElementById('bgmEnabled').addEventListener('change', function () {
+        document.getElementById('bgmVolumeGroup').style.display = this.value === 'yes' ? 'block' : 'none';
+    });
+    document.getElementById('bgmVolumeSlider').addEventListener('input', function () {
+        document.getElementById('bgmVolumeLabel').textContent = this.value + '%';
+    });
 });
 
 function handleFile(file) {
@@ -89,18 +126,61 @@ function handleFile(file) {
     videoResult.style.display = 'none';
 }
 
+function renderShotsPreview(data) {
+    var panel = document.getElementById('shotsPreview');
+    var list = document.getElementById('shotsList');
+    if (!panel || !list || !data.shots_preview) return;
+    panel.style.display = 'block';
+    list.innerHTML = '';
+    data.shots_preview.forEach(function(s) {
+        var item = document.createElement('div');
+        item.className = 'shot-item';
+        item.innerHTML =
+            '<span class="shot-id">' + s.id + '</span>' +
+            '<span class="shot-action">' + (s.action || '') + '</span>' +
+            '<span class="shot-meta">' +
+                '<span class="shot-tag duration">' + s.duration + 's</span>' +
+                '<span class="shot-tag camera">' + s.camera + '</span>' +
+                '<span class="shot-tag mood">' + s.mood + '</span>' +
+                '<span class="shot-tag location">' + s.location + '</span>' +
+            '</span>' +
+            (s.narration ? '<span class="shot-extra" title="' + s.narration + '">' + s.narration + '</span>' : '');
+        list.appendChild(item);
+    });
+}
+
 function resetAll() {
     fileInput.value = '';
     uploadArea.style.display = 'block';
     fileInfo.style.display = 'none';
     configPanel.style.display = 'none';
     progressContainer.style.display = 'none';
+    pipelineStats.style.display = 'none';
+    var shotsPreview = document.getElementById('shotsPreview');
+    if (shotsPreview) shotsPreview.style.display = 'none';
     videoResult.style.display = 'none';
     currentSessionId = null;
+    currentMode = 'semi_auto';
+    switchMode('semi_auto');
     for (var i = 1; i <= 6; i++) {
         var s = document.getElementById('pstep' + i);
         if (s) { s.className = 'pipeline-step'; }
     }
+    updatePipelineStat(statShots, '-');
+    updatePipelineStat(statScenes, '-');
+    updatePipelineStat(statChars, '-');
+}
+
+function updatePipelineStat(el, val) {
+    if (!el) return;
+    el.querySelector('.chip-val').textContent = val;
+}
+
+function showStats(shots, scenes, chars) {
+    pipelineStats.style.display = 'flex';
+    updatePipelineStat(statShots, shots);
+    updatePipelineStat(statScenes, scenes);
+    updatePipelineStat(statChars, chars);
 }
 
 function updatePipelineStep(status) {
@@ -125,13 +205,21 @@ async function startPipeline() {
 
     var formData = new FormData();
     formData.append('file', file);
-    formData.append('style_template', document.getElementById('styleTemplate').value);
-    formData.append('duration_mode', document.getElementById('durationMode').value);
-    formData.append('consistency_strategy', document.getElementById('consistencyStrategy').value);
-    formData.append('resolution', document.getElementById('resolution').value);
-    formData.append('auto_subtitle', document.getElementById('autoSubtitle').value);
-    formData.append('auto_sfx', document.getElementById('autoSfx').value);
-    formData.append('bgm_volume', document.getElementById('bgmVolume').value);
+    formData.append('mode', currentMode);
+
+    if (currentMode === 'auto') {
+        formData.append('total_duration', document.getElementById('totalDuration').value);
+    } else {
+        formData.append('style_template', document.getElementById('styleTemplate').value);
+        formData.append('duration_mode', document.getElementById('durationMode').value);
+        formData.append('resolution', document.getElementById('resolution').value);
+        formData.append('video_quality', document.getElementById('videoQuality').value);
+        formData.append('auto_subtitle', document.getElementById('autoSubtitle').value);
+        formData.append('auto_sfx', document.getElementById('autoSfx').value);
+        formData.append('original_audio_level', document.getElementById('bgmVolume').value);
+        formData.append('bgm_enabled', document.getElementById('bgmEnabled').value);
+        formData.append('bgm_volume', document.getElementById('bgmVolumeSlider').value);
+    }
 
     try {
         progressTitle.textContent = '正在上传...';
@@ -143,30 +231,34 @@ async function startPipeline() {
         if (!res.ok) throw new Error(data.error);
         currentSessionId = data.session_id;
 
-        progressTitle.textContent = 'AI 解析分镜脚本...';
-        progressText.textContent = 'DeepSeek 正在提取分镜结构';
-        updatePipelineStep('PARSED');
-        res = await fetch('/api/session/' + currentSessionId + '/parse', { method: 'POST' });
+        progressTitle.textContent = currentMode === 'auto' ? 'AI 全自动设计分镜...' : 'AI 分析文档、设计分镜...';
+        progressText.textContent = currentMode === 'auto' ? 'DeepSeek V4 通读文档 → 完全自主设计镜头/风格/运镜/节奏'
+            : 'DeepSeek V4 通读文档 → 自主设计镜头/时长/景别';
+        updatePipelineStep('SHOTS_DESIGNED');
+        res = await fetch('/api/session/' + currentSessionId + '/design-shots', { method: 'POST' });
         data = await res.json();
         if (!res.ok) throw new Error(data.error);
+        showStats(data.shot_count, data.scene_count || '-', data.character_count || '-');
+        if (data.shots_preview) renderShotsPreview(data);
 
         progressTitle.textContent = '生成 Prompts...';
-        progressText.textContent = '为 ' + data.shot_count + ' 个镜头生成图文 Prompt';
+        progressText.textContent = currentMode === 'auto' ? 'AI 自选风格 + 角色锚定 · 情绪弧线 · 叙事链'
+            : '视觉圣经 + 角色锚定 · 情绪弧线 · 叙事链';
         updatePipelineStep('PROMPTS_READY');
         res = await fetch('/api/session/' + currentSessionId + '/prompts', { method: 'POST' });
         data = await res.json();
         if (!res.ok) throw new Error(data.error);
 
-        progressTitle.textContent = '生成关键帧图片...';
-        progressText.textContent = 'Seedream 文生图 (场景级共享，减少消耗)';
+        progressTitle.textContent = '并行生成关键帧...';
+        progressText.textContent = 'Seedream 5.0 文生图 · 场景级关键帧共享 · 并行加速';
         updatePipelineStep('IMAGES_GENERATED');
         res = await fetch('/api/session/' + currentSessionId + '/images', { method: 'POST' });
         data = await res.json();
         if (!res.ok) throw new Error(data.error);
         if (data.failed.length > 0) showToast(data.failed.length + ' 个场景生成失败', 'error');
 
-        progressTitle.textContent = '生成视频片段...';
-        progressText.textContent = 'Seedance 图生视频';
+        progressTitle.textContent = '并行生成视频片段...';
+        progressText.textContent = 'Seedance 2.0 图生视频 · 并行轮询下载';
         updatePipelineStep('VIDEOS_GENERATED');
         res = await fetch('/api/session/' + currentSessionId + '/videos', { method: 'POST' });
         data = await res.json();
@@ -174,7 +266,7 @@ async function startPipeline() {
         if (data.failed.length > 0) showToast(data.failed.length + ' 个镜头视频生成失败', 'error');
 
         progressTitle.textContent = '合成最终视频...';
-        progressText.textContent = 'TTS 配音 + 拼接';
+        progressText.textContent = 'Edge TTS 中文配音 + ffmpeg 合成';
         updatePipelineStep('COMPOSED');
         res = await fetch('/api/session/' + currentSessionId + '/compose', { method: 'POST' });
         data = await res.json();

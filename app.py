@@ -171,7 +171,9 @@ def session_create():
             'video_quality': request.form.get('video_quality', '480p'),
             'auto_subtitle': request.form.get('auto_subtitle', 'yes'),
             'auto_sfx': request.form.get('auto_sfx', 'no'),
-            'original_audio_level': int(request.form.get('bgm_volume', 20))
+            'original_audio_level': int(request.form.get('original_audio_level', 20)),
+            'bgm_enabled': request.form.get('bgm_enabled', 'no'),
+            'bgm_volume': int(request.form.get('bgm_volume', 10))
         }
 
     _save_state(session_id, {

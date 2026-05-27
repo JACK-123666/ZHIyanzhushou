@@ -133,6 +133,19 @@
                                 <input type="range" id="bgmVolume" min="0" max="100" value="20" class="volume-slider">
                                 <span id="bgmVolumeLabel">20%</span>
                             </div>
+                            <div class="option-group">
+                                <label>背景音乐</label>
+                                <select id="bgmEnabled" class="modern-select">
+                                    <option value="no">关闭</option>
+                                    <option value="yes">开启</option>
+                                </select>
+                                <span class="option-hint">自动匹配免费BGM</span>
+                            </div>
+                            <div class="option-group" id="bgmVolumeGroup" style="display:none">
+                                <label>BGM音量</label>
+                                <input type="range" id="bgmVolumeSlider" min="5" max="30" value="10" class="volume-slider">
+                                <span id="bgmVolumeLabel">10%</span>
+                            </div>
                         </div>
                     </div>
 

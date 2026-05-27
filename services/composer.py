@@ -51,6 +51,54 @@ def compose_video(session_dir, shots, config):
             _add_silent_audio(p, sp)
             normalized.append(sp); temps.append(sp)
 
+    # === 时长修正 ===
+    nar_total = sum(len(s.get('narration', '')) / 4 for s in shots)  # 中文~4字/秒
+    vid_total = sum(_get_duration(p) for p in normalized)
+
+    if nar_total > vid_total and len(normalized) > 0:
+        last = normalized[-1]
+        diff = nar_total - vid_total
+        loops = int(diff / (_get_duration(last) or 5)) + 1
+        looped = os.path.join(session_dir, 'last_looped.mp4')
+        subprocess.run(['ffmpeg', '-y', '-stream_loop', str(loops), '-i', _norm(last),
+            '-t', str(diff), '-c', 'copy', _norm(looped)],
+            capture_output=True, text=True)
+        concatted = os.path.join(session_dir, 'last_extended.mp4')
+        subprocess.run(['ffmpeg', '-y',
+            '-i', _norm(last), '-i', _norm(looped),
+            '-filter_complex', '[0:v][0:a][1:v][1:a]concat=n=2:v=1:a=1[outv][outa]',
+            '-map', '[outv]', '-map', '[outa]',
+            '-c:v', 'libx264', '-c:a', 'aac', _norm(concatted)],
+            capture_output=True, text=True)
+        normalized[-1] = concatted
+        temps.extend([looped, concatted])
+
+    # === BGM 混音 ===
+    bgm_enabled = config.get('bgm_enabled', 'no') == 'yes'
+    if bgm_enabled:
+        bgm_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'resource', 'bgm')
+        if os.path.exists(bgm_dir):
+            bgm_files = [f for f in os.listdir(bgm_dir) if f.endswith('.mp3')]
+            if bgm_files:
+                bgm_vol = int(config.get('bgm_volume', 10)) / 100.0
+                bgm_path = os.path.join(bgm_dir, bgm_files[hash(session_dir) % len(bgm_files)])
+                for i, clip_path in enumerate(normalized):
+                    dur = _get_duration(clip_path)
+                    bgm_clip = os.path.join(session_dir, 'bgm_{}.mp4'.format(i))
+                    subprocess.run(['ffmpeg', '-y',
+                        '-i', _norm(clip_path),
+                        '-stream_loop', '-1', '-i', _norm(bgm_path),
+                        '-filter_complex',
+                        '[1:a]volume={},aformat=sample_fmts=fltp:channel_layouts=stereo,atrim=0:{},afade=t=out:st={}:d=3[bgm];'
+                        '[0:a]volume={}[orig];'
+                        '[bgm][orig]amix=inputs=2:duration=first[outa]'.format(
+                            bgm_vol, dur, max(0,dur-3), 1.0 - bgm_vol),
+                        '-map', '0:v', '-map', '[outa]',
+                        '-c:v', 'copy', '-c:a', 'aac', _norm(bgm_clip)],
+                        capture_output=True, text=True)
+                    normalized[i] = bgm_clip
+                    temps.append(bgm_clip)
+
     ts = datetime.now().strftime('%Y%m%d_%H%M%S')
     out = os.path.join(session_dir, f"{ts}_final.mp4")
 
