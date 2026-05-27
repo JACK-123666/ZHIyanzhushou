@@ -7,7 +7,7 @@ import json, re, time
 from openai import OpenAI
 from config import (DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL,
                     STYLE_TEMPLATES, DURATION_MODES, CAMERA_INSTRUCTIONS,
-                    AUTO_DURATION_OPTIONS, LANGUAGES, DEFAULT_LANGUAGE)
+                    AUTO_DURATION_OPTIONS)
 
 # ================================================================
 # System Prompt 1: 分镜设计师 — 文档 → 完整分镜表
@@ -398,9 +398,6 @@ def design_shots_from_document(document_text, config=None):
     if config is None:
         config = {}
     mode = config.get('mode', 'semi_auto')
-    lang = config.get('language', DEFAULT_LANGUAGE)
-    lang_word = LANGUAGES.get(lang, LANGUAGES[DEFAULT_LANGUAGE])['prompt']
-
     client = _get_client()
 
     if mode == 'auto':
@@ -414,7 +411,7 @@ def design_shots_from_document(document_text, config=None):
 
         # === Phase 1: 剧本分析 — 提取内容本质，不做创作决策 ===
         content = _call_llm(client,
-            [{"role": "system", "content": f"输出语言: {lang_word}\n\n{ANALYZE_SYSTEM}"},
+            [{"role": "system", "content": ANALYZE_SYSTEM},
              {"role": "user", "content": ANALYZE_USER.format(document=document_text)}],
             0.3, 16000)
         analysis = _extract_json(content)
@@ -422,7 +419,7 @@ def design_shots_from_document(document_text, config=None):
         # === Phase 2: 导演设计 — 基于分析报告做创作决策 ===
         analysis_json = json.dumps(analysis, ensure_ascii=False, indent=2)
         content = _call_llm(client,
-            [{"role": "system", "content": f"输出语言: {lang_word}\n\n{SHOT_DESIGN_AUTO_SYSTEM.format(duration_note=duration_note)}"},
+            [{"role": "system", "content": SHOT_DESIGN_AUTO_SYSTEM.format(duration_note=duration_note)},
              {"role": "user", "content": SHOT_DESIGN_AUTO_USER.format(
                  analysis=analysis_json, dur_goal=dur_goal)}],
             0.6, 32000)
@@ -435,7 +432,7 @@ def design_shots_from_document(document_text, config=None):
 
     # semi_auto 模式：单次调用
     duration_mode = config.get('duration_mode', 'uniform')
-    system = f"输出语言: {lang_word}\n\n{SHOT_DESIGN_SYSTEM}"
+    system = SHOT_DESIGN_SYSTEM
     user = SHOT_DESIGN_USER.format(document=document_text, duration_mode=duration_mode)
     content = _call_llm(client,
         [{"role": "system", "content": system}, {"role": "user", "content": user}],
@@ -449,8 +446,6 @@ def design_shots_from_document(document_text, config=None):
 def generate_prompts(shots, config, character_summary=None):
     """两轮生成: R1视觉圣经 → R2逐镜头Prompt → 占位符替换 → 主镜锚定 → 验证。"""
     mode = config.get('mode', 'semi_auto')
-    lang = config.get('language', DEFAULT_LANGUAGE)
-    lang_word = LANGUAGES.get(lang, LANGUAGES[DEFAULT_LANGUAGE])['prompt']
     if mode == 'auto':
         # 全自动: 使用 LLM 自主选择的风格
         style_prefix = config.get('visual_style_directive',
@@ -487,7 +482,7 @@ def generate_prompts(shots, config, character_summary=None):
 
     # === Round 1: 视觉圣经 ===
     bible = _extract_json(_call_llm(client, [
-        {"role": "system", "content": f"输出语言: {lang_word}\n\n{BIBLE_SYSTEM}"},
+        {"role": "system", "content": BIBLE_SYSTEM},
         {"role": "user", "content": BIBLE_USER.format(
             style_prefix=style_prefix, character_summary=char_summary_text,
             shots_json=shots_basic_json)}
@@ -545,7 +540,7 @@ def generate_prompts(shots, config, character_summary=None):
     shot_connections = '\n'.join(bible.get('shot_connections', []))
 
     prompts = _extract_json(_call_llm(client, [
-        {"role": "system", "content": f"输出语言: {lang_word}\n\n{PROMPT_GEN_SYSTEM}"},
+        {"role": "system", "content": PROMPT_GEN_SYSTEM},
         {"role": "user", "content": PROMPT_GEN_USER.format(
             global_style=global_style, character_bible=character_bible,
             location_bible=location_bible, shot_connections=shot_connections,
