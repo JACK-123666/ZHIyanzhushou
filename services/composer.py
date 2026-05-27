@@ -78,7 +78,7 @@ def compose_video(session_dir, shots, config):
     if bgm_enabled:
         bgm_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'resource', 'bgm')
         if os.path.exists(bgm_dir):
-            bgm_files = [f for f in os.listdir(bgm_dir) if f.endswith('.mp3')]
+            bgm_files = [f for f in os.listdir(bgm_dir) if f.endswith(('.mp3', '.wav'))]
             if bgm_files:
                 bgm_vol = int(config.get('bgm_volume', 10)) / 100.0
                 bgm_path = os.path.join(bgm_dir, bgm_files[hash(session_dir) % len(bgm_files)])
