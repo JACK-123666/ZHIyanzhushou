@@ -229,6 +229,17 @@ function updatePipelineStep(status) {
         if (i < idx) s.classList.add('done');
         else if (i === idx) s.classList.add('active');
     }
+    // 更新进度条
+    var bar = document.getElementById('progressBar');
+    if (bar) {
+        var pcts = [5, 15, 30, 55, 85, 100];
+        bar.style.width = pcts[Math.min(idx, 5)] + '%';
+    }
+    // 更新百分比文字
+    var pctEl = document.getElementById('progressPct');
+    if (pctEl && idx >= 0) {
+        pctEl.textContent = pcts[Math.min(idx, 5)] + '%';
+    }
 }
 
 async function startPipeline() {
