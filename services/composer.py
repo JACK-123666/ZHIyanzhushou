@@ -15,6 +15,10 @@ def compose_video(session_dir, shots, config):
     processed, temps = [], []
     auto_sub = config.get('auto_subtitle', 'yes') == 'yes'
     vid_vol = int(config.get('original_audio_level', 20)) / 100.0
+    # 按语言选字幕字体
+    from config import LANGUAGES, DEFAULT_LANGUAGE
+    lang = config.get('language', DEFAULT_LANGUAGE)
+    subtitle_font = LANGUAGES.get(lang, LANGUAGES[DEFAULT_LANGUAGE]).get('font', '')
 
     for shot in shots:
         vp = shot.get('video_path') or os.path.join(session_dir, f"{shot['id']}.mp4")
@@ -26,7 +30,7 @@ def compose_video(session_dir, shots, config):
         sub_text = shot.get('on_screen_text', '')
         if auto_sub and sub_text:
             sp = os.path.join(session_dir, f"{shot['id']}_subbed.mp4")
-            _burn_subtitle(cur, sub_text, sp)
+            _burn_subtitle(cur, sub_text, sp, subtitle_font)
             cur = sp; temps.append(sp)
 
         # 旁白混音（original_audio_level控制原视频音量，值越高原音越低）
@@ -166,10 +170,11 @@ def _xfade_filter(n, dur, durations):
     return f'{ac};{vc};[{last}]copy[outv]'
 
 
-def _burn_subtitle(vp, text, out):
-    """ffmpeg drawtext 烧录硬字幕到底部。安全过滤后自动换行。"""
-    import re
-    safe = re.sub(r"[^一-鿿a-zA-Z0-9\s.,!?;:()（）【】《》、。，！？；：\"'%@#$&*+=~\[\]{{}}<>/|\\\\-]",
+def _burn_subtitle(vp, text, out, font_path=None):
+    """ffmpeg drawtext 烧录硬字幕到底部。按语言选字体，支持中日韩英。"""
+    import re, os as _os
+    safe = re.sub(r"[^一-鿿぀-ゟ゠-ヿ가-힯"
+                  r"a-zA-Z0-9\s.,!?;:()（）【】《》、。，！？；：\"'%@#$&*+=~\[\]{{}}<>/|\\\\-]",
                   '', text).replace("'", "\\'").replace(":", "\\:")
 
     lines, cur = [], ''
@@ -181,16 +186,23 @@ def _burn_subtitle(vp, text, out):
 
     vf = (f"drawtext=text='{txt}':fontsize=28:fontcolor=white:borderw=2:"
           f"bordercolor=black@0.6:x=(w-text_w)/2:y=h-th-60")
-    # 先尝试黑体，失败用默认字体
-    r = subprocess.run(['ffmpeg', '-y', '-i', _norm(vp), '-vf',
-        vf + f":fontfile=/Windows/Fonts/simhei.ttf",
-        '-c:v', 'libx264', '-c:a', 'copy', '-preset', 'fast', '-pix_fmt', 'yuv420p', _norm(out)],
-        capture_output=True, text=True)
-    if r.returncode != 0:
-        r = subprocess.run(['ffmpeg', '-y', '-i', _norm(vp), '-vf', vf,
+    # 按语言选字体，找不到则回退
+    font_list = []
+    if font_path and _os.path.exists(font_path):
+        font_list.append(font_path)
+    font_list.append('/Windows/Fonts/simhei.ttf')
+    for font in font_list:
+        r = subprocess.run(['ffmpeg', '-y', '-i', _norm(vp), '-vf',
+            vf + f":fontfile={font}",
             '-c:v', 'libx264', '-c:a', 'copy', '-preset', 'fast', '-pix_fmt', 'yuv420p', _norm(out)],
             capture_output=True, text=True)
-        if r.returncode != 0: raise RuntimeError(f"字幕失败: {r.stderr[:300]}")
+        if r.returncode == 0:
+            return out
+    # 最终回退
+    r = subprocess.run(['ffmpeg', '-y', '-i', _norm(vp), '-vf', vf,
+        '-c:v', 'libx264', '-c:a', 'copy', '-preset', 'fast', '-pix_fmt', 'yuv420p', _norm(out)],
+        capture_output=True, text=True)
+    if r.returncode != 0: raise RuntimeError(f"字幕失败: {r.stderr[:300]}")
     return out
 
 

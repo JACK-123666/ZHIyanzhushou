@@ -117,6 +117,21 @@ AUTO_DURATION_OPTIONS = {
     'long':  {'label': '5 分钟',     'seconds': 300},
 }
 
+# --- 多语言 & TTS ---
+
+LANGUAGES = {
+    'zh': {'label': '中文', 'tts_voice': 'zh-CN-XiaoxiaoNeural',
+           'font': '/Windows/Fonts/simhei.ttf', 'prompt': '中文'},
+    'en': {'label': 'English', 'tts_voice': 'en-US-JennyNeural',
+           'font': '/Windows/Fonts/segoeui.ttf', 'prompt': 'English'},
+    'ja': {'label': '日本語', 'tts_voice': 'ja-JP-NanamiNeural',
+           'font': 'resource/fonts/msgothic.ttc', 'prompt': '日本語'},
+    'ko': {'label': '한국어', 'tts_voice': 'ko-KR-SunHiNeural',
+           'font': '/Windows/Fonts/malgun.ttf', 'prompt': '한국어'},
+}
+
+DEFAULT_LANGUAGE = 'zh'
+
 
 def get_model_config(key):
     return AI_MODELS.get(key)

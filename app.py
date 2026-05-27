@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 
 from logger_config import setup_logger
 from config import (MAX_UPLOAD_SIZE, ALLOWED_DOC_EXTENSIONS, get_model_config,
-                     AUTO_MODE_DEFAULTS, AUTO_DURATION_OPTIONS)
+                     AUTO_MODE_DEFAULTS, AUTO_DURATION_OPTIONS, LANGUAGES, DEFAULT_LANGUAGE)
 from services.document_parser import parse_document
 from services.llm_service import generate_prompts, design_shots_from_document
 from services.image_generator import generate_image
@@ -161,7 +161,10 @@ def session_create():
                                                    AUTO_DURATION_OPTIONS['auto'])['seconds']
         config = {**AUTO_MODE_DEFAULTS,
                   'mode': 'auto', 'total_duration': total_duration,
-                  'duration_mode': 'ai_design'}
+                  'duration_mode': 'ai_design',
+                  'language': request.form.get('language', DEFAULT_LANGUAGE),
+                  'tts_voice': LANGUAGES.get(request.form.get('language', DEFAULT_LANGUAGE),
+                                             LANGUAGES[DEFAULT_LANGUAGE])['tts_voice']}
     else:
         config = {
             'mode': 'semi_auto',
@@ -173,7 +176,10 @@ def session_create():
             'auto_sfx': request.form.get('auto_sfx', 'no'),
             'original_audio_level': int(request.form.get('original_audio_level', 20)),
             'bgm_enabled': request.form.get('bgm_enabled', 'no'),
-            'bgm_volume': int(request.form.get('bgm_volume', 10))
+            'bgm_volume': int(request.form.get('bgm_volume', 10)),
+            'language': request.form.get('language', DEFAULT_LANGUAGE),
+            'tts_voice': request.form.get('tts_voice',
+                        LANGUAGES[DEFAULT_LANGUAGE]['tts_voice'])
         }
 
     _save_state(session_id, {
