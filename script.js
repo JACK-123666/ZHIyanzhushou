@@ -151,7 +151,7 @@ document.addEventListener('DOMContentLoaded', function () {
 function handleFile(file) {
     var ext = '.' + file.name.split('.').pop().toLowerCase();
     if (ALLOWED_EXTENSIONS.indexOf(ext) === -1) {
-        showToast('仅支持 .docx 或 .txt 格式', 'error');
+        showToast(t('toast_upload_fail'), 'error');
         return;
     }
     fileName.textContent = file.name;
@@ -233,7 +233,7 @@ function updatePipelineStep(status) {
 
 async function startPipeline() {
     var file = fileInput.files[0];
-    if (!file) return showToast('请先选择文件', 'error');
+    if (!file) return showToast(t('toast_no_file'), 'error');
 
     configPanel.style.display = 'none';
     progressContainer.style.display = 'block';
@@ -312,10 +312,10 @@ async function startPipeline() {
         videoResult.style.display = 'block';
         resultVideo.src = data.videoUrl;
         resultVideo.load();
-        showToast('视频生成完成！', 'success');
+        showToast(t('toast_success'), 'success');
 
     } catch (err) {
-        showToast('生成失败: ' + err.message, 'error');
+        showToast(t('toast_generate_fail') + err.message, 'error');
         configPanel.style.display = 'block';
         progressContainer.style.display = 'none';
     }

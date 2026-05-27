@@ -61,5 +61,16 @@
   "toast_upload_fail": "Only .docx or .txt format supported",
   "toast_no_file": "Please select a file first",
   "toast_generate_fail": "Generation failed: ",
-  "toast_success": "Video generated successfully!"
+  "toast_success": "Video generated successfully!",
+  "opt_3d_cartoon": "3D Cartoon",
+  "opt_2d_flat": "2D Flat",
+  "opt_semi_realistic": "Semi-Realistic",
+  "opt_pencil_sketch": "Pencil Sketch",
+  "opt_1920x1080": "1920x1080 (16:9)",
+  "opt_1024x1024": "1024x1024 (1:1)",
+  "opt_1080x1920": "1080x1920 (9:16)",
+  "shots_preview_title": "AI Shot Design Results",
+  "stat_shots": "Shots",
+  "stat_scenes": "Scenes",
+  "stat_chars": "Characters"
 }

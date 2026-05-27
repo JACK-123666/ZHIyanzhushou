@@ -81,74 +81,74 @@
 
                     <!-- 半自动：现有配置项 -->
                     <div class="config-panel-inner" id="configSemi">
-                        <div class="options-header"><h3>生成配置</h3></div>
+                        <div class="options-header"><h3 data-i18n="config_title">生成配置</h3></div>
                         <div class="options-grid">
                             <div class="option-group">
-                                <label>视觉风格</label>
+                                <label data-i18n="label_style">视觉风格</label>
                                 <select id="styleTemplate" class="modern-select">
-                                    <option value="3d_cartoon">3D卡通</option>
-                                    <option value="2d_flat">2D扁平</option>
-                                    <option value="semi_realistic">写实简化</option>
-                                    <option value="pencil_sketch">素描线稿</option>
+                                    <option value="3d_cartoon" data-i18n="opt_3d_cartoon">3D卡通</option>
+                                    <option value="2d_flat" data-i18n="opt_2d_flat">2D扁平</option>
+                                    <option value="semi_realistic" data-i18n="opt_semi_realistic">写实简化</option>
+                                    <option value="pencil_sketch" data-i18n="opt_pencil_sketch">素描线稿</option>
                                 </select>
                             </div>
                             <div class="option-group">
-                                <label>时长模式</label>
+                                <label data-i18n="label_duration">时长模式</label>
                                 <select id="durationMode" class="modern-select">
-                                    <option value="ai_design">智能分配（推荐）</option>
-                                    <option value="uniform">统一5秒</option>
-                                    <option value="auto_split">长镜拆分</option>
+                                    <option value="ai_design" data-i18n="option_duration_ai">智能分配（推荐）</option>
+                                    <option value="uniform" data-i18n="option_duration_uniform">统一5秒</option>
+                                    <option value="auto_split" data-i18n="option_duration_split">长镜拆分</option>
                                 </select>
                             </div>
                             <div class="option-group">
-                                <label>角色一致性</label>
-                                <div class="info-badge">角色锚定</div>
-                                <span class="option-hint">自动提取 + 硬约束注入</span>
+                                <label data-i18n="label_character">角色一致性</label>
+                                <div class="info-badge" data-i18n="badge_character">角色锚定</div>
+                                <span class="option-hint" data-i18n="hint_character">自动提取 + 硬约束注入</span>
                             </div>
                             <div class="option-group">
-                                <label>视频画质</label>
+                                <label data-i18n="label_quality">视频画质</label>
                                 <select id="videoQuality" class="modern-select">
-                                    <option value="480p">480p 标准（省钱）</option>
-                                    <option value="720p">720p 高清</option>
+                                    <option value="480p" data-i18n="option_quality_480">480p 标准（省钱）</option>
+                                    <option value="720p" data-i18n="option_quality_720">720p 高清</option>
                                 </select>
                             </div>
                             <div class="option-group">
-                                <label>图片分辨率</label>
+                                <label data-i18n="label_resolution">图片分辨率</label>
                                 <select id="resolution" class="modern-select">
-                                    <option value="1920x1080">1920x1080 (16:9)</option>
-                                    <option value="1024x1024">1024x1024 (1:1)</option>
-                                    <option value="1080x1920">1080x1920 (9:16)</option>
+                                    <option value="1920x1080" data-i18n="opt_1920x1080">1920x1080 (16:9)</option>
+                                    <option value="1024x1024" data-i18n="opt_1024x1024">1024x1024 (1:1)</option>
+                                    <option value="1080x1920" data-i18n="opt_1080x1920">1080x1920 (9:16)</option>
                                 </select>
                             </div>
                             <div class="option-group">
-                                <label>自动字幕</label>
+                                <label data-i18n="label_subtitle">自动字幕</label>
                                 <select id="autoSubtitle" class="modern-select">
-                                    <option value="yes">是</option>
-                                    <option value="no">否</option>
+                                    <option value="yes" data-i18n="option_yes">是</option>
+                                    <option value="no" data-i18n="option_no">否</option>
                                 </select>
                             </div>
                             <div class="option-group">
-                                <label>自动音效</label>
+                                <label data-i18n="label_sfx">自动音效</label>
                                 <select id="autoSfx" class="modern-select">
-                                    <option value="no">否</option>
-                                    <option value="yes">是</option>
+                                    <option value="no" data-i18n="option_no">否</option>
+                                    <option value="yes" data-i18n="option_yes">是</option>
                                 </select>
                             </div>
                             <div class="option-group">
-                                <label>原视频音量</label>
+                                <label data-i18n="label_video_volume">原视频音量</label>
                                 <input type="range" id="bgmVolume" min="0" max="100" value="20" class="volume-slider">
                                 <span id="bgmVolumeLabel">20%</span>
                             </div>
                             <div class="option-group">
-                                <label>背景音乐</label>
+                                <label data-i18n="label_bgm">背景音乐</label>
                                 <select id="bgmEnabled" class="modern-select">
-                                    <option value="no">关闭</option>
-                                    <option value="yes">开启</option>
+                                    <option value="no" data-i18n="option_bgm_off">关闭</option>
+                                    <option value="yes" data-i18n="option_bgm_on">开启</option>
                                 </select>
-                                <span class="option-hint">自动匹配免费BGM</span>
+                                <span class="option-hint" data-i18n="hint_bgm">自动匹配免费BGM</span>
                             </div>
                             <div class="option-group" id="bgmVolumeGroup" style="display:none">
-                                <label>BGM音量</label>
+                                <label data-i18n="label_bgm_volume">BGM音量</label>
                                 <input type="range" id="bgmVolumeSlider" min="5" max="30" value="10" class="volume-slider">
                                 <span id="bgmVolumeLabel">10%</span>
                             </div>
@@ -157,18 +157,18 @@
 
                     <!-- 全自动：仅选择总时长 -->
                     <div class="config-panel-inner" id="configAuto" style="display:none">
-                        <div class="options-header"><h3>全自动生成</h3></div>
-                        <p style="text-align:center;color:var(--text-secondary);margin-bottom:1rem">
+                        <div class="options-header"><h3 data-i18n="auto_title">全自动生成</h3></div>
+                        <p style="text-align:center;color:var(--text-secondary);margin-bottom:1rem" data-i18n="auto_desc">
                             AI 通读文档，自主设计分镜、风格、运镜、节奏
                         </p>
                         <div class="options-grid" style="max-width:300px;margin:0 auto">
                             <div class="option-group">
-                                <label>视频总时长</label>
+                                <label data-i18n="label_total_duration">视频总时长</label>
                                 <select id="totalDuration" class="modern-select">
-                                    <option value="auto">AI 自主决定</option>
-                                    <option value="short">1 分钟</option>
-                                    <option value="medium">3 分钟</option>
-                                    <option value="long">5 分钟</option>
+                                    <option value="auto" data-i18n="option_duration_auto">AI 自主决定</option>
+                                    <option value="short" data-i18n="option_duration_1min">1 分钟</option>
+                                    <option value="medium" data-i18n="option_duration_3min">3 分钟</option>
+                                    <option value="long" data-i18n="option_duration_5min">5 分钟</option>
                                 </select>
                             </div>
                         </div>
@@ -176,7 +176,7 @@
 
                     <button class="generate-button" id="generateButton">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                        开始生成
+                        <span data-i18n="generate_button">开始生成</span>
                     </button>
                 </div>
 
@@ -186,27 +186,27 @@
                         <p id="progressText">正在上传文件</p>
                     </div>
                     <div class="pipeline-steps">
-                        <div class="pipeline-step" id="pstep1"><span class="pstep-icon">1</span><span>上传</span></div>
-                        <div class="pipeline-step" id="pstep2"><span class="pstep-icon">2</span><span>分镜</span></div>
-                        <div class="pipeline-step" id="pstep3"><span class="pstep-icon">3</span><span>Prompt</span></div>
-                        <div class="pipeline-step" id="pstep4"><span class="pstep-icon">4</span><span>出图</span></div>
-                        <div class="pipeline-step" id="pstep5"><span class="pstep-icon">5</span><span>视频</span></div>
-                        <div class="pipeline-step" id="pstep6"><span class="pstep-icon">6</span><span>合成</span></div>
+                        <div class="pipeline-step" id="pstep1"><span class="pstep-icon">1</span><span data-i18n="progress_upload">上传</span></div>
+                        <div class="pipeline-step" id="pstep2"><span class="pstep-icon">2</span><span data-i18n="progress_design">分镜</span></div>
+                        <div class="pipeline-step" id="pstep3"><span class="pstep-icon">3</span><span data-i18n="progress_prompt">Prompt</span></div>
+                        <div class="pipeline-step" id="pstep4"><span class="pstep-icon">4</span><span data-i18n="progress_images">出图</span></div>
+                        <div class="pipeline-step" id="pstep5"><span class="pstep-icon">5</span><span data-i18n="progress_videos">视频</span></div>
+                        <div class="pipeline-step" id="pstep6"><span class="pstep-icon">6</span><span data-i18n="progress_compose">合成</span></div>
                     </div>
                     <div class="pipeline-stats" id="pipelineStats" style="display:none;">
-                        <div class="stat-chip" id="statShots"><span class="chip-val">-</span><span class="chip-label">镜头</span></div>
-                        <div class="stat-chip" id="statScenes"><span class="chip-val">-</span><span class="chip-label">场景</span></div>
-                        <div class="stat-chip" id="statChars"><span class="chip-val">-</span><span class="chip-label">角色</span></div>
+                        <div class="stat-chip" id="statShots"><span class="chip-val">-</span><span class="chip-label" data-i18n="stat_shots">镜头</span></div>
+                        <div class="stat-chip" id="statScenes"><span class="chip-val">-</span><span class="chip-label" data-i18n="stat_scenes">场景</span></div>
+                        <div class="stat-chip" id="statChars"><span class="chip-val">-</span><span class="chip-label" data-i18n="stat_chars">角色</span></div>
                     </div>
                     <div class="shots-preview" id="shotsPreview" style="display:none;">
-                        <h4 class="shots-preview-title">AI 分镜设计结果</h4>
+                        <h4 class="shots-preview-title" data-i18n="shots_preview_title">AI 分镜设计结果</h4>
                         <div class="shots-list" id="shotsList"></div>
                     </div>
                 </div>
 
                 <div class="video-result" id="videoResult" style="display: none;">
                     <div class="result-header">
-                        <h3>视频生成完成</h3>
+                        <h3 data-i18n="result_title">视频生成完成</h3>
                     </div>
                     <div class="video-container">
                         <video controls id="resultVideo" preload="metadata">
@@ -216,11 +216,11 @@
                     <div class="video-actions">
                         <button class="action-button download-button" id="downloadBtn">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                            下载视频
+                            <span data-i18n="download_button">下载视频</span>
                         </button>
                         <button class="action-button new-video-button" id="newVideoBtn">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-                            生成新视频
+                            <span data-i18n="new_video_button">生成新视频</span>
                         </button>
                     </div>
                 </div>
@@ -232,8 +232,8 @@
         <div class="container">
             <div class="about-content">
                 <div class="about-text">
-                    <h2>关于智演助手 1.5</h2>
-                    <p>DeepSeek V4 + Seedream 5.0 + Seedance 2.0 全自动视频流水线。角色锚定确保人物跨镜头一致、场景级关键帧共享、多线程并行提速。</p>
+                    <h2 data-i18n="about_title">关于智演助手 1.5</h2>
+                    <p data-i18n="about_desc">DeepSeek V4 + Seedream 5.0 + Seedance 2.0 全自动视频流水线。角色锚定确保人物跨镜头一致、场景级关键帧共享、多线程并行提速。</p>
                 </div>
                 <div class="about-stats">
                     <div class="stat-card"><div class="stat-number">6</div><div class="stat-label">流水线阶段</div></div>
@@ -245,7 +245,7 @@
         </div>
     </section>
 
-    <footer class="footer"><div class="container"><p>&copy; 2026 智演助手 1.5 · DeepSeek + Seedream + Seedance</p></div></footer>
+    <footer class="footer"><div class="container"><p data-i18n="footer_text">&copy; 2026 智演助手 1.5 · DeepSeek + Seedream + Seedance</p></div></footer>
     <script src="script.js"></script>
 </body>
 </html>
