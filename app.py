@@ -589,12 +589,41 @@ def session_download(session_id):
 @app.route('/api/session/<session_id>/status', methods=['GET'])
 def session_status(session_id):
     state = _load_state(session_id)
-    if not state: return jsonify({'error': 'Session 不存在'}), 404
-    return jsonify({'session_id': session_id, 'status': state.get('status'),
-                    'shot_count': len(state.get('shots', [])),
-                    'failed_shots': state.get('failed_shots', []),
-                    'config': state.get('config'),
-                    'created_at': state.get('created_at')})
+    if not state:
+        return jsonify({'error': 'Session 不存在'}), 404
+
+    status = state.get('status', 'UPLOADED')
+    shots = state.get('shots', [])
+    total = len(shots) or 1
+
+    # 进度百分比
+    progress_map = {
+        'UPLOADED': 5, 'SHOTS_DESIGNED': 15, 'PROMPTS_READY': 30,
+        'IMAGES_GENERATED': 55, 'VIDEOS_GENERATED': 85, 'COMPOSED': 100
+    }
+    base = progress_map.get(status, 5)
+
+    if status == 'IMAGES_GENERATED' or status == 'VIDEOS_GENERATED' or status == 'COMPOSED':
+        done = sum(1 for s in shots if s.get('video_path' if status != 'IMAGES_GENERATED' else 'image_path') and
+                   os.path.exists(s.get('video_path' if status != 'IMAGES_GENERATED' else 'image_path', '')))
+        if status == 'IMAGES_GENERATED':
+            progress = min(45 + int((done / total) * 20), 64)
+        elif status == 'VIDEOS_GENERATED':
+            progress = min(65 + int((done / total) * 30), 94)
+        else:
+            progress = 100
+    else:
+        progress = base
+
+    step_detail = '{} ({}/{})'.format(status,
+        sum(1 for s in shots if s.get('video_path')), total) if status in ('IMAGES_GENERATED','VIDEOS_GENERATED') else status
+
+    return jsonify({
+        'session_id': session_id, 'status': status, 'progress': progress,
+        'step_detail': step_detail,
+        'stats': {'shots_done': sum(1 for s in shots if s.get('image_path')),
+                  'shots_total': total}
+    })
 
 
 if __name__ == '__main__':
