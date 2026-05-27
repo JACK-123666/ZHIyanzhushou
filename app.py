@@ -39,6 +39,25 @@ os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
 ACCESS_TOKEN = os.environ.get('ACCESS_TOKEN', '')
 
+if not ACCESS_TOKEN:
+    import secrets
+    ACCESS_TOKEN = secrets.token_urlsafe(16)
+    logger.warning('=' * 50)
+    logger.warning(f'未设置 ACCESS_TOKEN，已生成随机密码: {ACCESS_TOKEN}')
+    logger.warning(f'请将 ACCESS_TOKEN={ACCESS_TOKEN} 添加到 .env 文件')
+    logger.warning('=' * 50)
+
+
+def _sanitize_error(e):
+    """生产模式脱敏错误信息，防止泄漏 API 端点/密钥"""
+    msg = _sanitize_error(e)
+    # 过滤常见敏感信息
+    for pattern in ['api_key', 'Bearer', 'ark.cn', 'volces.com', 'api.deepseek.com',
+                    'endpoint', 'token', 'sk-', 'ep-']:
+        if pattern.lower() in msg.lower():
+            return '服务暂时不可用，请稍后重试'
+    return msg[:200] if len(msg) > 200 else msg
+
 
 def _login_page(error=''):
     """极简登录页，零依赖"""
@@ -84,6 +103,22 @@ def login():
                 httponly=True, secure=True, samesite='Lax')
         return resp
     return _login_page('密码错误')
+
+
+# --- 速率限制：防止 API 滥用（每 IP 每小时最多 5 个会话） ---
+
+_rate_log = {}  # {ip: [timestamp, ...]}
+
+def _check_rate_limit():
+    ip = request.remote_addr or '127.0.0.1'
+    now = time.time()
+    window = now - 3600
+    _rate_log.setdefault(ip, [])
+    _rate_log[ip] = [t for t in _rate_log[ip] if t > window]
+    if len(_rate_log[ip]) >= 5:
+        return False
+    _rate_log[ip].append(now)
+    return True
 
 
 # --- 会话管理：每个 session 一个文件夹，状态存 state.json ---
@@ -133,6 +168,9 @@ def static_files(filename):
 
 @app.route('/api/session/create', methods=['POST'])
 def session_create():
+    if not _check_rate_limit():
+        return jsonify({'error': '请求过于频繁，请稍后再试 (每小时最多 5 次)'}), 429
+
     if 'file' not in request.files:
         return jsonify({'error': '没有文件'}), 400
 
@@ -663,8 +701,8 @@ def session_rerun(session_id):
         return jsonify(results)
 
     except Exception as e:
-        logger.error('rerun 失败: {}'.format(str(e)))
-        return jsonify({'error': str(e)}), 500
+        logger.error('rerun 失败: {}'.format(_sanitize_error(e)))
+        return jsonify({'error': _sanitize_error(e)}), 500
 
 
 @app.route('/api/session/<session_id>/download', methods=['GET'])

@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+
+# Git
+.git/
+.gitignore
+
+# 敏感文件
+.env
+.env.example
+
+# 运行时数据（volume 挂载，不进镜像）
+uploads/
+outputs/
+logs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# 临时文件
+*.log
+test_*.txt
+/tmp/
+
+# 文档（不需要打包进镜像）
+docs/
+README.md
