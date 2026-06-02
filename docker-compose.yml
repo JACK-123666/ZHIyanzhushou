@@ -13,3 +13,21 @@ services:
     restart: unless-stopped
     environment:
       - FLASK_ENV=production
+
+  mysql:
+    image: mysql:8.0
+    container_name: clip_trends_mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-clip123456}
+      MYSQL_DATABASE: clip_trends
+      MYSQL_USER: ${MYSQL_USER:-clip_trends}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-clip123456}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./clip_trends/sql/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
