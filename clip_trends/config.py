@@ -22,9 +22,9 @@ VIDEO_ANALYSIS = {
 
 MYSQL_CONFIG = {
     'host': os.environ.get('MYSQL_HOST', 'localhost'),
-    'port': int(os.environ.get('MYSQL_PORT', 3306)),
+    'port': int(os.environ.get('MYSQL_PORT') or 3306),
     'user': os.environ.get('MYSQL_USER', 'clip_trends'),
-    'password': os.environ.get('MYSQL_PASSWORD', ''),
+    'password': os.environ.get('MYSQL_PASSWORD', 'clip123456'),
     'database': os.environ.get('MYSQL_DATABASE', 'clip_trends'),
     'charset': 'utf8mb4',
 }
@@ -33,5 +33,6 @@ DASHSCOPE_API_KEY = os.environ.get('DASHSCOPE_API_KEY', '')
 PEXELS_API_KEY = os.environ.get('PEXELS_API_KEY', '')
 PIXABAY_API_KEY = os.environ.get('PIXABAY_API_KEY', '')
 
+# NOTE: 与根目录 config.py 重复定义，后续考虑抽取共享常量模块
 DEEPSEEK_API_KEY = os.environ.get('DEEPSEEK_API_KEY', '')
 DEEPSEEK_BASE_URL = os.environ.get('DEEPSEEK_BASE_URL', 'https://api.deepseek.com')

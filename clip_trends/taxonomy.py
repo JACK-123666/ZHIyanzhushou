@@ -531,8 +531,6 @@ def seed_taxonomy(db_config):
 
 if __name__ == "__main__":
     # Allow running directly to seed taxonomy into a running MySQL container
-    import sys
-    sys.path.insert(0, ".")
-    from config import MYSQL_CONFIG
+    from clip_trends.config import MYSQL_CONFIG
 
     seed_taxonomy(MYSQL_CONFIG)

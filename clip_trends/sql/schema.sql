@@ -23,7 +23,7 @@ CREATE TABLE videos (
     id INT PRIMARY KEY AUTO_INCREMENT,
     site VARCHAR(20) NOT NULL,
     source_url VARCHAR(500) NOT NULL,
-    source_id VARCHAR(100),
+    source_id VARCHAR(100) NOT NULL,
     title VARCHAR(300),
     thumbnail_url VARCHAR(500),
     duration_sec DECIMAL(8,2),
@@ -66,7 +66,7 @@ CREATE TABLE daily_trends (
     sample_video_ids JSON,
     trending_direction ENUM('rising','stable','declining') DEFAULT 'stable',
     UNIQUE KEY uk_date_taxonomy (date, taxonomy_id),
-    FOREIGN KEY (taxonomy_id) REFERENCES technique_taxonomy(id),
+    FOREIGN KEY (taxonomy_id) REFERENCES technique_taxonomy(id) ON DELETE CASCADE,
     INDEX idx_date (date),
     INDEX idx_trending (trending_direction)
 ) ENGINE=InnoDB;
@@ -80,7 +80,8 @@ CREATE TABLE crawl_logs (
     videos_total INT DEFAULT 0,
     videos_new INT DEFAULT 0,
     errors TEXT,
-    status ENUM('running','success','partial','failed') DEFAULT 'running'
+    status ENUM('running','success','partial','failed') DEFAULT 'running',
+    INDEX idx_site (site)
 ) ENGINE=InnoDB;
 
 -- 4.6 剪辑模板表
