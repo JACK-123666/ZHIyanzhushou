@@ -19,6 +19,7 @@ from services.llm_service import generate_prompts, design_shots_from_document
 from services.image_generator import generate_image
 from services.tts_service import generate_narration
 from services.composer import compose_video
+from services.trend_service import get_trending_techniques, search_techniques
 
 load_dotenv()  # 加载 .env 里的 API 密钥
 
@@ -753,6 +754,37 @@ def session_status(session_id):
         'stats': {'shots_done': sum(1 for s in shots if s.get('image_path')),
                   'shots_total': total}
     })
+
+
+# =========================================================================
+# 智演助手集成: /api/trends — 剪辑趋势查询
+# =========================================================================
+
+@app.route('/api/trends')
+def api_trends():
+    """剪辑趋势查询 — Token 鉴权"""
+    token = request.headers.get('X-Access-Token', '')
+    if token != ACCESS_TOKEN:
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    dim = request.args.get('dimension')
+    limit = min(int(request.args.get('limit', 10)), 50)
+    search = request.args.get('search', '').strip()
+
+    if search:
+        results = search_techniques(search, [dim] if dim else None, limit)
+    else:
+        results = get_trending_techniques(dim, limit)
+
+    # 序列化 JSON 字段
+    for r in results:
+        if 'sample_video_ids' in r and isinstance(r['sample_video_ids'], str):
+            try:
+                r['sample_video_ids'] = json.loads(r['sample_video_ids'])
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+    return jsonify(results)
 
 
 if __name__ == '__main__':

@@ -198,7 +198,12 @@ SHOT_DESIGN_AUTO_SYSTEM = """你是资深电影导演。你收到的不是原始
    "on_screen_text":"字幕","mood":"情绪标签"}}],
  "scene_map":{{"场景名":["SC01"]}},
  "character_summary":{{"角色名":"从分析报告逐字复制外貌"}}}}
-只输出JSON。"""
+只输出JSON。
+
+=== 本周热点剪辑趋势 ===
+{trending_context}
+
+在分镜设计中参考以上趋势，融入适合本故事风格的流行技法。"""
 
 SHOT_DESIGN_AUTO_USER = """=== 剧本分析报告 ===
 {analysis}
@@ -418,8 +423,16 @@ def design_shots_from_document(document_text, config=None):
 
         # === Phase 2: 导演设计 — 基于分析报告做创作决策 ===
         analysis_json = json.dumps(analysis, ensure_ascii=False, indent=2)
+        # 注入剪辑趋势上下文
+        try:
+            from services.trend_service import get_weekly_trend_context
+            trending_context = get_weekly_trend_context()
+        except Exception:
+            trending_context = "（暂无趋势数据）"
+        system_prompt = SHOT_DESIGN_AUTO_SYSTEM.format(
+            duration_note=duration_note, trending_context=trending_context)
         content = _call_llm(client,
-            [{"role": "system", "content": SHOT_DESIGN_AUTO_SYSTEM.format(duration_note=duration_note)},
+            [{"role": "system", "content": system_prompt},
              {"role": "user", "content": SHOT_DESIGN_AUTO_USER.format(
                  analysis=analysis_json, dur_goal=dur_goal)}],
             0.6, 32000)
