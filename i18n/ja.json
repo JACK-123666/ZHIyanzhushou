@@ -72,5 +72,12 @@
   "shots_preview_title": "AIショット設計結果",
   "stat_shots": "ショット",
   "stat_scenes": "シーン",
-  "stat_chars": "キャラ"
+  "stat_chars": "キャラ",
+  "trends_title": "編集トレンド",
+  "trends_all_dim": "すべての次元",
+  "trends_search_placeholder": "技法を検索...",
+  "trends_loading": "読み込み中...",
+  "trends_error": "読み込み失敗、再試行してください",
+  "trends_empty": "トレンドデータなし",
+  "trends_videos": "本"
 }

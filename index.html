@@ -180,6 +180,39 @@
                     </button>
                 </div>
 
+                <!-- 剪辑趋势面板 -->
+                <div class="trends-section" id="trendsSection">
+                  <div class="trends-header" id="trendsToggle">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
+                      <polyline points="17 6 23 6 23 12"/>
+                    </svg>
+                    <span data-i18n="trends_title">剪辑趋势</span>
+                    <span class="trends-badge" id="trendsBadge">--</span>
+                    <svg class="trends-chevron" id="trendsChevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polyline points="6 9 12 15 18 9"/>
+                    </svg>
+                  </div>
+                  <div class="trends-body" id="trendsBody" style="display:none;">
+                    <div class="trends-filters">
+                      <select id="trendsDimFilter">
+                        <option value="" data-i18n="trends_all_dim">全部维度</option>
+                        <option value="时间">时间</option>
+                        <option value="空间">空间</option>
+                        <option value="叙事">叙事</option>
+                        <option value="节奏">节奏</option>
+                        <option value="视听">视听</option>
+                        <option value="表现">表现</option>
+                        <option value="技术">技术</option>
+                      </select>
+                      <input type="text" id="trendsSearch" data-i18n-placeholder="trends_search_placeholder" placeholder="搜索技法..." />
+                    </div>
+                    <div class="trends-list" id="trendsList">
+                      <div class="trends-empty" data-i18n="trends_loading">加载中...</div>
+                    </div>
+                  </div>
+                </div>
+
                 <div class="progress-container" id="progressContainer" style="display: none;">
                     <div class="progress-header">
                         <h3 id="progressTitle">准备中...</h3>

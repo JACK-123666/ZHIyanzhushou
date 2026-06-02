@@ -72,5 +72,12 @@
   "shots_preview_title": "AI 分镜设计结果",
   "stat_shots": "镜头",
   "stat_scenes": "场景",
-  "stat_chars": "角色"
+  "stat_chars": "角色",
+  "trends_title": "剪辑趋势",
+  "trends_all_dim": "全部维度",
+  "trends_search_placeholder": "搜索技法...",
+  "trends_loading": "加载中...",
+  "trends_error": "加载失败，请稍后重试",
+  "trends_empty": "暂无趋势数据",
+  "trends_videos": "个视频"
 }

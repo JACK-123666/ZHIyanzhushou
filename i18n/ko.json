@@ -72,5 +72,12 @@
   "shots_preview_title": "AI 숏 설계 결과",
   "stat_shots": "숏",
   "stat_scenes": "씬",
-  "stat_chars": "캐릭터"
+  "stat_chars": "캐릭터",
+  "trends_title": "편집 트렌드",
+  "trends_all_dim": "전체 차원",
+  "trends_search_placeholder": "기법 검색...",
+  "trends_loading": "로딩 중...",
+  "trends_error": "로딩 실패, 다시 시도해주세요",
+  "trends_empty": "트렌드 데이터 없음",
+  "trends_videos": "개"
 }

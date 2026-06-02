@@ -72,5 +72,12 @@
   "shots_preview_title": "AI Shot Design Results",
   "stat_shots": "Shots",
   "stat_scenes": "Scenes",
-  "stat_chars": "Characters"
+  "stat_chars": "Characters",
+  "trends_title": "Clip Trends",
+  "trends_all_dim": "All Dimensions",
+  "trends_search_placeholder": "Search techniques...",
+  "trends_loading": "Loading...",
+  "trends_error": "Failed to load, please retry",
+  "trends_empty": "No trend data yet",
+  "trends_videos": "videos"
 }

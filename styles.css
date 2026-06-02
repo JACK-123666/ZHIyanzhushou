@@ -593,3 +593,147 @@ body {
         transition-duration: .01ms !important;
     }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   TRENDS PANEL — 剪辑趋势
+   ═══════════════════════════════════════════════════════════════ */
+
+.trends-section {
+  margin-top: 24px;
+  background: #FFF;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.trends-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+  cursor: pointer;
+  user-select: none;
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--color-foreground);
+  transition: background 0.15s;
+}
+
+.trends-header:hover {
+  background: var(--color-muted);
+}
+
+.trends-badge {
+  margin-left: auto;
+  background: var(--color-primary);
+  color: #FFF;
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-weight: 500;
+}
+
+.trends-chevron {
+  transition: transform 0.2s;
+  opacity: 0.5;
+}
+
+.trends-body {
+  border-top: 1px solid var(--color-border);
+  padding: 16px 18px;
+}
+
+.trends-filters {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.trends-filters select,
+.trends-filters input {
+  padding: 8px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font-size: 13px;
+  background: var(--color-background);
+  color: var(--color-foreground);
+  outline: none;
+  font-family: inherit;
+}
+
+.trends-filters select:focus,
+.trends-filters input:focus {
+  border-color: var(--color-accent);
+}
+
+.trends-filters input {
+  flex: 1;
+}
+
+.trends-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.trends-empty {
+  width: 100%;
+  text-align: center;
+  color: var(--color-secondary);
+  font-size: 13px;
+  padding: 20px;
+}
+
+.trend-card {
+  flex: 0 0 calc(33.333% - 7px);
+  min-width: 160px;
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 12px;
+  transition: border-color 0.15s;
+}
+
+.trend-card:hover {
+  border-color: var(--color-accent);
+}
+
+.trend-card-dim {
+  font-size: 11px;
+  color: var(--color-accent);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+
+.trend-card-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-foreground);
+  margin-bottom: 6px;
+}
+
+.trend-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--color-secondary);
+}
+
+.trend-arrow.rising { color: #22c55e; }
+.trend-arrow.declining { color: #ef4444; }
+.trend-arrow.stable { color: var(--color-secondary); }
+
+@media (max-width: 768px) {
+  .trend-card {
+    flex: 0 0 calc(50% - 5px);
+  }
+}
+
+@media (max-width: 480px) {
+  .trend-card {
+    flex: 1 1 100%;
+  }
+}

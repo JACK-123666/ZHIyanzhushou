@@ -331,3 +331,76 @@ async function startPipeline() {
         progressContainer.style.display = 'none';
     }
 }
+
+// === 剪辑趋势面板 ===
+
+var trendsToggle = document.getElementById('trendsToggle');
+var trendsBody = document.getElementById('trendsBody');
+var trendsChevron = document.getElementById('trendsChevron');
+
+if (trendsToggle) {
+  trendsToggle.addEventListener('click', function () {
+    var isOpen = trendsBody.style.display !== 'none';
+    trendsBody.style.display = isOpen ? 'none' : 'block';
+    trendsChevron.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(180deg)';
+    if (!isOpen) loadTrends();
+  });
+}
+
+async function loadTrends() {
+  var dim = document.getElementById('trendsDimFilter')?.value || '';
+  var search = document.getElementById('trendsSearch')?.value.trim() || '';
+  var list = document.getElementById('trendsList');
+  var badge = document.getElementById('trendsBadge');
+  if (!list) return;
+
+  list.innerHTML = '<div class="trends-empty">' + t('trends_loading') + '</div>';
+
+  try {
+    var url = '/api/trends?limit=12';
+    if (dim) url += '&dimension=' + encodeURIComponent(dim);
+    if (search) url += '&search=' + encodeURIComponent(search);
+
+    var resp = await fetch(url, {
+      headers: { 'X-Access-Token': localStorage.getItem('access_token') || '' }
+    });
+
+    if (!resp.ok) {
+      list.innerHTML = '<div class="trends-empty">' + t('trends_error') + '</div>';
+      return;
+    }
+
+    var data = await resp.json();
+
+    if (badge) badge.textContent = data.length || '0';
+
+    if (!data.length) {
+      list.innerHTML = '<div class="trends-empty">' + t('trends_empty') + '</div>';
+      return;
+    }
+
+    list.innerHTML = data.map(function(item) {
+      var arrow = { rising: '↑', declining: '↓', stable: '→' }[item.trending_direction] || '→';
+      var cls = item.trending_direction || 'stable';
+      return '<div class="trend-card">' +
+        '<div class="trend-card-dim">' + (item.dimension || '') + '</div>' +
+        '<div class="trend-card-name">' + (item.category || '') + ' · ' + (item.subcategory || '') + '</div>' +
+        '<div class="trend-card-meta">' +
+          '<span class="trend-arrow ' + cls + '">' + arrow + '</span>' +
+          '<span class="trend-count">' + (item.total_videos || 0) + ' ' + t('trends_videos') + '</span>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+
+  } catch (e) {
+    list.innerHTML = '<div class="trends-empty">' + t('trends_error') + '</div>';
+  }
+}
+
+// 筛选变化监听
+document.getElementById('trendsDimFilter')?.addEventListener('change', loadTrends);
+var trendsSearchTimer;
+document.getElementById('trendsSearch')?.addEventListener('input', function () {
+  clearTimeout(trendsSearchTimer);
+  trendsSearchTimer = setTimeout(loadTrends, 400);
+});
