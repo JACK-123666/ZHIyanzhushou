@@ -35,7 +35,7 @@ def get_conn():
 # --- videos ---
 
 def upsert_videos(raw_videos: list) -> list[int]:
-    """批量 upsert 视频，返回新增的视频 ID 列表"""
+    """批量 upsert 视频，返回新增的视频 ID 列表（原子写，防 TOCTOU 竞态）"""
     new_ids = []
     with get_conn() as conn:
         cur = conn.cursor()
@@ -43,26 +43,19 @@ def upsert_videos(raw_videos: list) -> list[int]:
             source_id = rv.source_id or hashlib.sha256(
                 rv.source_url.encode()).hexdigest()[:32]
             cur.execute(
-                "SELECT id FROM videos WHERE site=%s AND source_id=%s",
-                (rv.site, source_id)
+                """INSERT INTO videos
+                   (site, source_url, source_id, title, thumbnail_url,
+                    duration_sec, resolution, tags_json, description, popularity_score)
+                   VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                   ON DUPLICATE KEY UPDATE
+                       popularity_score = VALUES(popularity_score),
+                       updated_at = NOW()""",
+                (rv.site, rv.source_url, source_id, rv.title,
+                 rv.thumbnail_url, rv.duration_sec, rv.resolution,
+                 json.dumps(rv.tags, ensure_ascii=False),
+                 rv.description, rv.popularity_score)
             )
-            existing = cur.fetchone()
-            if existing:
-                cur.execute(
-                    "UPDATE videos SET popularity_score=%s, updated_at=NOW() WHERE id=%s",
-                    (rv.popularity_score, existing[0])
-                )
-            else:
-                cur.execute(
-                    """INSERT INTO videos
-                       (site, source_url, source_id, title, thumbnail_url,
-                        duration_sec, resolution, tags_json, description, popularity_score)
-                       VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
-                    (rv.site, rv.source_url, source_id, rv.title,
-                     rv.thumbnail_url, rv.duration_sec, rv.resolution,
-                     json.dumps(rv.tags, ensure_ascii=False),
-                     rv.description, rv.popularity_score)
-                )
+            if cur.lastrowid:
                 new_ids.append(cur.lastrowid)
     return new_ids
 
@@ -182,8 +175,8 @@ def extract_editing_templates():
                 combo_counts[combo] = combo_counts.get(combo, 0) + 1
 
         for combo, count in combo_counts.items():
-            if count >= 3:
-                tax_ids = [int(x) for x in combo.split(',')]
+            tax_ids = [int(x) for x in combo.split(',')]
+            if count >= 3 and len(tax_ids) >= 2:  # 至少2个技法才算组合模板
                 tax_ids_json = json.dumps(tax_ids)
                 cur.execute(
                     "SELECT id FROM editing_templates WHERE taxonomy_ids_json=%s",
