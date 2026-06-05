@@ -1,6 +1,6 @@
 """ffmpeg 下载+抽帧 + ffprobe 音频分析"""
 import os, glob, subprocess, json, tempfile
-from config import VIDEO_ANALYSIS
+from .config import VIDEO_ANALYSIS
 
 
 def analyze_video(video_url: str, download_func) -> dict | None:

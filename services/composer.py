@@ -2,8 +2,10 @@
 视频合成 — ffmpeg 驱动: 字幕叠加 + 旁白混音 + 音轨统一 + xfade拼接
 """
 
-import os, subprocess
+import os, subprocess, logging
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 
 def _norm(path):
@@ -64,16 +66,20 @@ def compose_video(session_dir, shots, config):
         diff = nar_total - vid_total
         loops = int(diff / (_get_duration(last) or 5)) + 1
         looped = os.path.join(session_dir, 'last_looped.mp4')
-        subprocess.run(['ffmpeg', '-y', '-stream_loop', str(loops), '-i', _norm(last),
+        r_loop = subprocess.run(['ffmpeg', '-y', '-stream_loop', str(loops), '-i', _norm(last),
             '-t', str(diff), '-c', 'copy', _norm(looped)],
             capture_output=True, text=True)
+        if r_loop.returncode != 0:
+            logger.warning(f"视频循环扩展失败: {r_loop.stderr[:300]}")
         concatted = os.path.join(session_dir, 'last_extended.mp4')
-        subprocess.run(['ffmpeg', '-y',
+        r_concat = subprocess.run(['ffmpeg', '-y',
             '-i', _norm(last), '-i', _norm(looped),
             '-filter_complex', '[0:v][0:a][1:v][1:a]concat=n=2:v=1:a=1[outv][outa]',
             '-map', '[outv]', '-map', '[outa]',
             '-c:v', 'libx264', '-c:a', 'aac', _norm(concatted)],
             capture_output=True, text=True)
+        if r_concat.returncode != 0:
+            logger.warning(f"视频拼接失败: {r_concat.stderr[:300]}")
         normalized[-1] = concatted
         temps.extend([looped, concatted])
 
@@ -89,7 +95,7 @@ def compose_video(session_dir, shots, config):
                 for i, clip_path in enumerate(normalized):
                     dur = _get_duration(clip_path)
                     bgm_clip = os.path.join(session_dir, 'bgm_{}.mp4'.format(i))
-                    subprocess.run(['ffmpeg', '-y',
+                    r_bgm = subprocess.run(['ffmpeg', '-y',
                         '-i', _norm(clip_path),
                         '-stream_loop', '-1', '-i', _norm(bgm_path),
                         '-filter_complex',
@@ -100,6 +106,8 @@ def compose_video(session_dir, shots, config):
                         '-map', '0:v', '-map', '[outa]',
                         '-c:v', 'copy', '-c:a', 'aac', _norm(bgm_clip)],
                         capture_output=True, text=True)
+                    if r_bgm.returncode != 0:
+                        logger.warning(f"BGM 混音失败 (shot {i}): {r_bgm.stderr[:300]}")
                     normalized[i] = bgm_clip
                     temps.append(bgm_clip)
 
@@ -154,7 +162,7 @@ def _get_duration(fp):
         r = subprocess.run(['ffprobe', '-v', 'quiet', '-print_format', 'json',
                            '-show_format', _norm(fp)], capture_output=True, text=True)
         return float(_json.loads(r.stdout)['format'].get('duration', 5)) if r.returncode == 0 else 5
-    except: return 5
+    except Exception: return 5
 
 
 def _xfade_filter(n, dur, durations):

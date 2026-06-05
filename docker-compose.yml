@@ -18,10 +18,10 @@ services:
     image: mysql:8.0
     container_name: clip_trends_mysql
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-clip123456}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?required}
       MYSQL_DATABASE: clip_trends
       MYSQL_USER: ${MYSQL_USER:-clip_trends}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-clip123456}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?required}
     ports:
       - "3306:3306"
     volumes:

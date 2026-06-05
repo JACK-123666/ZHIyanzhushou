@@ -395,7 +395,8 @@ def _call_llm(client, messages, temperature, max_tokens, max_retries=3):
                 delay = min(5 * (2 ** attempt), 30)
                 time.sleep(delay)
             else:
-                raise
+                raise RuntimeError(
+                    f"LLM 调用失败，已重试 {max_retries} 次: {e}") from e
 
 
 def design_shots_from_document(document_text, config=None):
@@ -650,10 +651,14 @@ def _validate_prompts(prompts, shots, character_summary):
 
 
 def _get_client():
+    if not DEEPSEEK_API_KEY:
+        raise RuntimeError("DEEPSEEK_API_KEY 环境变量未设置，请在 .env 中配置")
     return OpenAI(api_key=DEEPSEEK_API_KEY, base_url=DEEPSEEK_BASE_URL)
 
 
 def _extract_json(text):
     text = text.strip()
     match = re.search(r'\{[\s\S]*\}|\[[\s\S]*\]', text)
-    return json.loads(match.group()) if match else json.loads(text)
+    if not match:
+        raise ValueError(f"LLM 响应中未找到 JSON 结构，原始内容: {text[:200]}")
+    return json.loads(match.group())

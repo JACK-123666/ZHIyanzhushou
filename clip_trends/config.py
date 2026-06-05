@@ -24,7 +24,7 @@ MYSQL_CONFIG = {
     'host': os.environ.get('MYSQL_HOST', 'localhost'),
     'port': int(os.environ.get('MYSQL_PORT') or 3306),
     'user': os.environ.get('MYSQL_USER', 'clip_trends'),
-    'password': os.environ.get('MYSQL_PASSWORD', 'clip123456'),
+    'password': os.environ.get('MYSQL_PASSWORD', ''),
     'database': os.environ.get('MYSQL_DATABASE', 'clip_trends'),
     'charset': 'utf8mb4',
 }

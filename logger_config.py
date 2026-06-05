@@ -1,15 +1,11 @@
 import logging
 import os
-from logging.handlers import RotatingFileHandler
-from datetime import datetime
+from logging.handlers import TimedRotatingFileHandler
 
 # 创建logs目录
 LOGS_DIR = os.path.join(os.path.dirname(__file__), 'logs')
 if not os.path.exists(LOGS_DIR):
     os.makedirs(LOGS_DIR)
-
-# 日志文件路径
-LOG_FILE = os.path.join(LOGS_DIR, f'app_{datetime.now().strftime("%Y%m%d")}.log')
 
 # 配置日志格式
 LOG_FORMAT = '[%(asctime)s] [%(levelname)s] [%(name)s] %(message)s'
@@ -24,21 +20,23 @@ def setup_logger(name='app'):
     if logger.handlers:
         return logger
 
-    # 文件处理器 - 所有日志
-    file_handler = RotatingFileHandler(
-        LOG_FILE,
-        maxBytes=10*1024*1024,  # 10MB
-        backupCount=5,
+    # 文件处理器 - 所有日志（按天轮转）
+    file_handler = TimedRotatingFileHandler(
+        os.path.join(LOGS_DIR, 'app.log'),
+        when='midnight',
+        interval=1,
+        backupCount=30,
         encoding='utf-8'
     )
     file_handler.setLevel(logging.DEBUG)
     file_handler.setFormatter(logging.Formatter(LOG_FORMAT, DATE_FORMAT))
 
-    # 文件处理器 - 仅错误日志
-    error_file_handler = RotatingFileHandler(
-        os.path.join(LOGS_DIR, f'error_{datetime.now().strftime("%Y%m%d")}.log'),
-        maxBytes=10*1024*1024,  # 10MB
-        backupCount=5,
+    # 文件处理器 - 仅错误日志（按天轮转）
+    error_file_handler = TimedRotatingFileHandler(
+        os.path.join(LOGS_DIR, 'error.log'),
+        when='midnight',
+        interval=1,
+        backupCount=30,
         encoding='utf-8'
     )
     error_file_handler.setLevel(logging.ERROR)

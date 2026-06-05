@@ -5,7 +5,7 @@ from datetime import date
 from contextlib import contextmanager
 import pymysql
 from dbutils.pooled_db import PooledDB
-from config import MYSQL_CONFIG
+from .config import MYSQL_CONFIG
 
 
 # 连接池（线程安全）
@@ -85,6 +85,8 @@ def refresh_daily_trends():
     today = date.today()
     with get_conn() as conn:
         cur = conn.cursor()
+        # 防止 JSON_ARRAYAGG 超过 MySQL 默认 group_concat_max_len (1024) 导致截断
+        cur.execute("SET SESSION group_concat_max_len = 65536")
         cur.execute("""
             INSERT INTO daily_trends (date, taxonomy_id, video_count, avg_popularity, avg_duration,
                                        sample_video_ids, trending_direction)
@@ -94,7 +96,7 @@ def refresh_daily_trends():
                 COUNT(DISTINCT vt.video_id) as video_count,
                 AVG(v.popularity_score) as avg_popularity,
                 AVG(v.duration_sec) as avg_duration,
-                JSON_ARRAYAGG(v.id LIMIT 5) as sample_video_ids,
+                JSON_ARRAYAGG(v.id) as sample_video_ids,
                 CASE
                     WHEN COALESCE(
                         (SELECT video_count FROM daily_trends dt2

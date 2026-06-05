@@ -2,7 +2,7 @@
 import time, requests, hashlib, os
 from dataclasses import dataclass
 from typing import Optional
-from config import CRAWL_CONFIG, VIDEO_ANALYSIS
+from ..config import CRAWL_CONFIG, VIDEO_ANALYSIS
 
 
 @dataclass

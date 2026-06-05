@@ -3,7 +3,7 @@
 DeepSeek(剧本) → Seedream(出图) → Seedance(视频) → ffmpeg(合成)
 """
 
-import os, json, uuid, time, hashlib
+import os, json, uuid, time, hashlib, threading
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from werkzeug.utils import secure_filename
@@ -40,7 +40,8 @@ os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
 ACCESS_TOKEN = os.environ.get('ACCESS_TOKEN', '')
 
-if not ACCESS_TOKEN:
+# 开发模式下不强制 auth，生产环境若未设 Token 则自动生成
+if not ACCESS_TOKEN and os.environ.get('FLASK_ENV') != 'development':
     import secrets
     ACCESS_TOKEN = secrets.token_urlsafe(16)
     logger.warning('=' * 50)
@@ -51,13 +52,13 @@ if not ACCESS_TOKEN:
 
 def _sanitize_error(e):
     """生产模式脱敏错误信息，防止泄漏 API 端点/密钥"""
-    msg = _sanitize_error(e)
-    # 过滤常见敏感信息
-    for pattern in ['api_key', 'Bearer', 'ark.cn', 'volces.com', 'api.deepseek.com',
-                    'endpoint', 'token', 'sk-', 'ep-']:
-        if pattern.lower() in msg.lower():
-            return '服务暂时不可用，请稍后重试'
-    return msg[:200] if len(msg) > 200 else msg
+    msg = str(e)
+    # 服务端记录真实错误
+    logger.error(f"请求异常: {msg[:500]}")
+    if os.environ.get('FLASK_ENV') == 'development':
+        return msg[:500]
+    # 生产环境始终返回通用提示，避免黑名单遗漏
+    return '服务暂时不可用，请稍后重试'
 
 
 def _login_page(error=''):
@@ -84,8 +85,11 @@ button:hover{{background:#2980b9}}
 
 @app.before_request
 def _gate():
+    # 开发/测试模式：不拦截，直接放行
+    if os.environ.get('FLASK_ENV') == 'development':
+        return
     if not ACCESS_TOKEN:
-        return  # 未配置 token → 跳过鉴权
+        return
     if request.endpoint in ('login', 'static_files'):
         return
     if request.cookies.get('auth') == ACCESS_TOKEN:
@@ -109,17 +113,23 @@ def login():
 # --- 速率限制：防止 API 滥用（每 IP 每小时最多 5 个会话） ---
 
 _rate_log = {}  # {ip: [timestamp, ...]}
+_rate_lock = threading.Lock()
 
 def _check_rate_limit():
     ip = request.remote_addr or '127.0.0.1'
     now = time.time()
     window = now - 3600
-    _rate_log.setdefault(ip, [])
-    _rate_log[ip] = [t for t in _rate_log[ip] if t > window]
-    if len(_rate_log[ip]) >= 5:
-        return False
-    _rate_log[ip].append(now)
-    return True
+    with _rate_lock:
+        entries = _rate_log.get(ip, [])
+        entries = [t for t in entries if t > window]
+        if not entries:
+            _rate_log.pop(ip, None)  # 清理过期 IP，防止内存泄漏
+        if len(entries) >= 5:
+            _rate_log[ip] = entries
+            return False
+        entries.append(now)
+        _rate_log[ip] = entries
+        return True
 
 
 # --- 会话管理：每个 session 一个文件夹，状态存 state.json ---
@@ -134,7 +144,10 @@ def _state_path(session_id):
 
 def _load_state(session_id):
     p = _state_path(session_id)
-    return json.load(open(p, 'r', encoding='utf-8')) if os.path.exists(p) else None
+    if not os.path.exists(p):
+        return None
+    with open(p, 'r', encoding='utf-8') as f:
+        return json.load(f)
 
 def _save_state(session_id, state):
     with open(_state_path(session_id), 'w', encoding='utf-8') as f:
@@ -188,7 +201,13 @@ def session_create():
     session_id = uuid.uuid4().hex[:32]
     safe_name = secure_filename(file.filename)
     ts = datetime.now().strftime('%Y%m%d%H%M%S')
-    filepath = os.path.join(_session_dir(session_id), f"{ts}_{safe_name}")
+    session_dir = _session_dir(session_id)
+    filepath = os.path.join(session_dir, f"{ts}_{safe_name}")
+    # 检查磁盘剩余空间（至少需要 500MB）
+    import shutil
+    free_mb = shutil.disk_usage(session_dir).free / (1024 * 1024)
+    if free_mb < 500:
+        return jsonify({'error': '磁盘空间不足，请联系管理员清理'}), 507
     file.save(filepath)
 
     # 根据 mode 组装配置：全自动用固定默认，半自动读取用户选择
@@ -300,12 +319,14 @@ def session_prompts(session_id):
     try:
         prompts = generate_prompts(state['shots'], state['config'],
                                     character_summary=state.get('character_summary'))
+        prompt_map = {p['shot_id']: p for p in prompts}
         for shot in state['shots']:
-            for p in prompts:
-                if p['shot_id'] == shot['id']:
-                    shot['image_prompt'] = p['image_prompt']
-                    shot['video_prompt'] = p['video_prompt']
-                    break
+            p = prompt_map.get(shot['id'])
+            if p:
+                shot['image_prompt'] = p['image_prompt']
+                shot['video_prompt'] = p['video_prompt']
+            else:
+                logger.warning(f"镜头 {shot['id']} 未收到 LLM prompt，使用默认值")
 
         _update_state(session_id, 'PROMPTS_READY', shots=state['shots'])
         logger.info(f"Prompt 完成: {len(state['shots'])}镜头")
@@ -489,7 +510,8 @@ def session_videos(session_id):
                 for f in as_completed([ex.submit(_poll, tid, s, o)
                                        for tid, (s, o) in task_map.items()]):
                     sid, ok = f.result()
-                    (None if ok else failed.append(sid))
+                    if not ok:
+                        failed.append(sid)
                     if ok: logger.info(f"  {sid} 视频完成")
 
         _update_state(session_id, 'VIDEOS_GENERATED', shots=state['shots'],
@@ -616,7 +638,10 @@ def session_retry_failed(session_id):
             with ThreadPoolExecutor(max_workers=min(len(targets), 5)) as ex:
                 for f in as_completed([ex.submit(_retry_one, s) for s in targets]):
                     sid, ok = f.result()
-                    (retried := retried + 1) if ok else still.append(sid)
+                    if ok:
+                        retried += 1
+                    else:
+                        still.append(sid)
 
     _update_state(session_id, status, shots=state['shots'], failed_shots=still)
     return jsonify({'status': 'RETRIED', 'retried': retried, 'still_failed': still})
@@ -789,4 +814,6 @@ def api_trends():
 
 if __name__ == '__main__':
     debug_mode = os.environ.get('FLASK_DEBUG', '0') == '1'
-    app.run(debug=debug_mode, host='0.0.0.0', port=5000)
+    # debug 模式仅绑定 localhost，防止 Werkzeug 调试控制台暴露到公网
+    host = '127.0.0.1' if debug_mode else '0.0.0.0'
+    app.run(debug=debug_mode, host=host, port=5000)

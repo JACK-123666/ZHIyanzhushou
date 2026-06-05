@@ -2,13 +2,23 @@
 """Qwen-VL API 封装：逐帧分析 + 帧间对比 + 综合标签映射"""
 import json, base64, time
 from openai import OpenAI
-from config import DASHSCOPE_API_KEY, VIDEO_ANALYSIS
+from .config import DASHSCOPE_API_KEY, VIDEO_ANALYSIS
 
 
-client = OpenAI(
-    api_key=DASHSCOPE_API_KEY,
-    base_url='https://dashscope.aliyuncs.com/compatible-mode/v1',
-)
+_client = None
+
+
+def _get_client():
+    """懒加载 Qwen-VL 客户端，避免 API Key 未配时模块导入就崩溃"""
+    global _client
+    if _client is None:
+        if not DASHSCOPE_API_KEY:
+            raise RuntimeError("DASHSCOPE_API_KEY is not set")
+        _client = OpenAI(
+            api_key=DASHSCOPE_API_KEY,
+            base_url='https://dashscope.aliyuncs.com/compatible-mode/v1',
+        )
+    return _client
 
 QWEN_MODEL = VIDEO_ANALYSIS.get('qwen_model', 'qwen-vl-max')
 
@@ -34,7 +44,7 @@ def analyze_frame(frame_path: str) -> dict:
   "depth_of_field": "浅/深/正常"
 }"""
     try:
-        resp = client.chat.completions.create(
+        resp = _get_client().chat.completions.create(
             model=QWEN_MODEL,
             messages=[{
                 "role": "user",
@@ -72,7 +82,7 @@ def compare_frames(frame_a_desc: dict, frame_b_desc: dict) -> dict:
   "analysis": "一句话描述帧间变化（中文15字以内）"
 }}"""
     try:
-        resp = client.chat.completions.create(
+        resp = _get_client().chat.completions.create(
             model=QWEN_MODEL,
             messages=[{"role": "user", "content": prompt}],
             max_tokens=300,

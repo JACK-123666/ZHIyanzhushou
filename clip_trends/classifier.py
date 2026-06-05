@@ -1,10 +1,10 @@
 """分类编排：Qwen-VL 主路径 → 规则降级 → LLM 兜底"""
 import json
-from config import DASHSCOPE_API_KEY
-from db import get_conn, save_techniques
-from taxonomy import get_all_taxonomy_entries
-from video_analyzer import analyze_video, cleanup_temp
-from qwen_client import analyze_video_frames
+from .config import DASHSCOPE_API_KEY
+from .db import get_conn, save_techniques
+from .taxonomy import get_all_taxonomy_entries
+from .video_analyzer import analyze_video, cleanup_temp
+from .qwen_client import analyze_video_frames
 
 
 # 预加载 taxonomy entries 列表（含 id）

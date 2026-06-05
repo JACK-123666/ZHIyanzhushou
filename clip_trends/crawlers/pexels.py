@@ -1,6 +1,6 @@
 # clip_trends/crawlers/pexels.py
 from .base import BaseCrawler, RawVideo
-from config import PEXELS_API_KEY
+from ..config import PEXELS_API_KEY
 
 
 class PexelsCrawler(BaseCrawler):

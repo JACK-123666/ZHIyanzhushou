@@ -5,18 +5,29 @@
 __pycache__/
 *.pyc
 *.pyo
+.venv/
 
 # 运行时目录
 uploads/
 outputs/
 logs/
 
+# 数据库（本地 MySQL 数据，不应提交）
+mysql_data/
+
+# Node.js
+node_modules/
+
 # IDE
 .vscode/
 .idea/
 
+# Claude / Superpowers 配置
+.claude/
+.superpowers/
+
 # Vercel
-.vercel
+.vercel/
 
 # OS
 .DS_Store

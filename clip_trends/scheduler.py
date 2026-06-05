@@ -2,10 +2,10 @@
 """APScheduler 每日定时任务"""
 import hashlib
 from apscheduler.schedulers.background import BackgroundScheduler
-from crawlers import CRAWLERS
-from db import upsert_videos, start_crawl_log, finish_crawl_log, get_conn, refresh_daily_trends, extract_editing_templates
-from classifier import classify
-from config import CRAWL_CONFIG
+from .crawlers import CRAWLERS
+from .db import upsert_videos, start_crawl_log, finish_crawl_log, get_conn, refresh_daily_trends, extract_editing_templates
+from .classifier import classify
+from .config import CRAWL_CONFIG
 
 
 scheduler = BackgroundScheduler()
@@ -29,13 +29,19 @@ def run_crawl_job():
                     rv.source_url.encode()).hexdigest()[:32]
                 rv_map[sid] = rv
 
-            for vid_id in new_ids:
-                # 从数据库回查 source_id
+            # 批量回查 source_id
+            id_to_source = {}
+            if new_ids:
                 with get_conn() as conn:
                     cur = conn.cursor()
-                    cur.execute("SELECT source_id FROM videos WHERE id=%s", (vid_id,))
-                    row = cur.fetchone()
-                source_id = row[0] if row else None
+                    placeholders = ','.join(['%s'] * len(new_ids))
+                    cur.execute(
+                        f"SELECT id, source_id FROM videos WHERE id IN ({placeholders})",
+                        new_ids)
+                    id_to_source = {row[0]: row[1] for row in cur.fetchall()}
+
+            for vid_id in new_ids:
+                source_id = id_to_source.get(vid_id)
                 rv = rv_map.get(source_id) if source_id else None
 
                 if rv and rv.source_url:

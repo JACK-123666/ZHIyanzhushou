@@ -10,7 +10,7 @@ _mysql_config = {
     'host': os.environ.get('MYSQL_HOST', 'localhost'),
     'port': int(os.environ.get('MYSQL_PORT') or 3306),
     'user': os.environ.get('MYSQL_USER', 'clip_trends'),
-    'password': os.environ.get('MYSQL_PASSWORD', 'clip123456'),
+    'password': os.environ.get('MYSQL_PASSWORD', ''),
     'database': os.environ.get('MYSQL_DATABASE', 'clip_trends'),
     'charset': 'utf8mb4',
 }
@@ -35,7 +35,9 @@ def _query(sql, params=None):
         rows = [dict(zip(columns, row)) for row in cur.fetchall()]
         conn.close()
         return rows
-    except Exception:
+    except Exception as e:
+        import logging
+        logging.getLogger('trend_service').error(f"数据库查询失败: {e}")
         return []
 
 

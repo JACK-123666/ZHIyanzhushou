@@ -1,6 +1,6 @@
 # clip_trends/crawlers/pixabay.py
 from .base import BaseCrawler, RawVideo
-from config import PIXABAY_API_KEY
+from ..config import PIXABAY_API_KEY
 
 
 class PixabayCrawler(BaseCrawler):

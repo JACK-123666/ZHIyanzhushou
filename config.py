@@ -55,13 +55,13 @@ AI_MODELS = {
         'name': 'Seedream 5.0 Lite（文生图）',
         'api_url': 'https://ark.cn-beijing.volces.com/api/v3/images/generations',
         'api_key': ARK_API_KEY,
-        'model': os.environ.get('SEEDREAM_ENDPOINT', 'your_seedream_endpoint'),
+        'model': os.environ.get('SEEDREAM_ENDPOINT', ''),
     },
     'seedance': {
         'name': 'Seedance 2.0 Fast（图生视频）',
         'api_url': 'https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks',
         'api_key': ARK_API_KEY,
-        'model': os.environ.get('SEEDANCE_ENDPOINT', 'your_seedance_endpoint'),
+        'model': os.environ.get('SEEDANCE_ENDPOINT', ''),
     },
 }
 
@@ -119,15 +119,44 @@ AUTO_DURATION_OPTIONS = {
 
 # --- 多语言 & TTS ---
 
+def _default_fonts():
+    """根据操作系统返回默认字体路径"""
+    import platform
+    system = platform.system()
+    font_env = os.environ.get('FONT_DIR', '')
+    if font_env:
+        return {
+            'zh': os.path.join(font_env, 'simhei.ttf'),
+            'en': os.path.join(font_env, 'segoeui.ttf'),
+            'ja': os.path.join(font_env, 'msgothic.ttc'),
+            'ko': os.path.join(font_env, 'malgun.ttf'),
+        }
+    if system == 'Windows':
+        return {
+            'zh': '/Windows/Fonts/simhei.ttf',
+            'en': '/Windows/Fonts/segoeui.ttf',
+            'ja': 'resource/fonts/msgothic.ttc',
+            'ko': '/Windows/Fonts/malgun.ttf',
+        }
+    # Linux / macOS
+    return {
+        'zh': '/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc',
+        'en': '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+        'ja': '/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc',
+        'ko': '/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc',
+    }
+
+_fonts = _default_fonts()
+
 LANGUAGES = {
     'zh': {'label': '中文', 'tts_voice': 'zh-CN-XiaoxiaoNeural',
-           'font': '/Windows/Fonts/simhei.ttf', 'prompt': '中文'},
+           'font': _fonts['zh'], 'prompt': '中文'},
     'en': {'label': 'English', 'tts_voice': 'en-US-JennyNeural',
-           'font': '/Windows/Fonts/segoeui.ttf', 'prompt': 'English'},
+           'font': _fonts['en'], 'prompt': 'English'},
     'ja': {'label': '日本語', 'tts_voice': 'ja-JP-NanamiNeural',
-           'font': 'resource/fonts/msgothic.ttc', 'prompt': '日本語'},
+           'font': _fonts['ja'], 'prompt': '日本語'},
     'ko': {'label': '한국어', 'tts_voice': 'ko-KR-SunHiNeural',
-           'font': '/Windows/Fonts/malgun.ttf', 'prompt': '한국어'},
+           'font': _fonts['ko'], 'prompt': '한국어'},
 }
 
 DEFAULT_LANGUAGE = 'zh'
