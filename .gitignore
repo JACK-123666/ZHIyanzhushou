@@ -26,6 +26,17 @@ node_modules/
 .claude/
 .superpowers/
 
+# Superpowers AI 规划文件（内部工作记录，不应提交）
+docs/superpowers/
+
+# 路演/业务材料（非源码文件）
+docs/*.pptx
+docs/*_slide.js
+docs/*pitch*
+docs/*讲稿*
+docs/*路演*
+docs/*财务*
+
 # Vercel
 .vercel/
 
