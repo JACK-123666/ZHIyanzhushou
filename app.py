@@ -10,18 +10,18 @@ from werkzeug.utils import secure_filename
 from flask import Flask, request, jsonify, send_file, send_from_directory, redirect
 from flask_cors import CORS
 from dotenv import load_dotenv
+load_dotenv()  # ⚠️ 必须在所有 config 导入之前加载 .env
 
 from logger_config import setup_logger
 from config import (MAX_UPLOAD_SIZE, ALLOWED_DOC_EXTENSIONS, get_model_config,
-                     AUTO_MODE_DEFAULTS, AUTO_DURATION_OPTIONS, LANGUAGES, DEFAULT_LANGUAGE)
+                     AUTO_MODE_DEFAULTS, AUTO_DURATION_OPTIONS, LANGUAGES, DEFAULT_LANGUAGE,
+                     STYLE_TEMPLATES)
 from services.document_parser import parse_document
 from services.llm_service import generate_prompts, design_shots_from_document
 from services.image_generator import generate_image
 from services.tts_service import generate_narration
 from services.composer import compose_video
 from services.trend_service import get_trending_techniques, search_techniques
-
-load_dotenv()  # 加载 .env 里的 API 密钥
 
 logger = setup_logger('app')
 logger.info("智演助手 1.5 启动")
@@ -337,7 +337,7 @@ def session_prompts(session_id):
 
 
 # =========================================================================
-# Step 4: Seedream 文生图 — 每镜头独立关键帧（5线程并行）
+# Step 4: Seedream 文生图 — 同场景首帧复用 + 并行生成（5线程并行）
 # =========================================================================
 
 @app.route('/api/session/<session_id>/images', methods=['POST'])
@@ -350,12 +350,75 @@ def session_images(session_id):
     sdir = _session_dir(session_id)
     failed = []
     max_image_retries = 3
-    valid_shots = [s for s in state['shots'] if s.get('image_prompt')]
+    ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+
+    # === Phase 0: 角色设定图（每个角色一张正面全身参考图）===
+    character_summary = state.get('character_summary', {})
+    char_sheet_paths = {}  # {角色名: 设定图路径}
+    if character_summary:
+        style_prefix = STYLE_TEMPLATES.get(
+            state['config'].get('style_template', '3d_cartoon'),
+            STYLE_TEMPLATES['3d_cartoon']
+        )['prompt']
+        for char_name, appearance in character_summary.items():
+            try:
+                sheet_path = os.path.join(sdir, f'char_{char_name}_sheet.png')
+                from services.image_generator import generate_character_sheet
+                generate_character_sheet(model_config, char_name, appearance,
+                                         style_prefix, state['config']['resolution'],
+                                         sheet_path)
+                if os.path.exists(sheet_path) and os.path.getsize(sheet_path) > 0:
+                    char_sheet_paths[char_name] = sheet_path
+                    logger.info(f"  角色设定图: {char_name} → char_{char_name}_sheet.png")
+            except Exception as e:
+                logger.warning(f"  角色设定图 {char_name} 失败: {e}")
+
+        # 将设定图视觉锚点注入每个镜头的 image_prompt
+        if char_sheet_paths:
+            for shot in state['shots']:
+                for char_info in shot.get('characters', []):
+                    cname = char_info.get('name', '')
+                    if cname in char_sheet_paths:
+                        # 在 prompt 末尾追加角色一致性锚点
+                        anchor = (f" CRITICAL CONSISTENCY: Characters in this scene must match "
+                                  f"their character reference sheet. Same face, same clothing, "
+                                  f"same proportions as the reference.")
+                        if 'image_prompt' in shot and anchor not in shot['image_prompt']:
+                            shot['image_prompt'] = shot['image_prompt'].rstrip() + anchor
+
+    state['char_sheet_paths'] = char_sheet_paths
+
+    # === 同场景首帧复用策略 ===
+    # 同一 location 的镜头共享第一镜的图片（仅运镜不同），保持角色外观一致
+    # 排除无角色的抽象镜头（图标动画/黑屏/纯字幕），这些各出各图
+    ABSTRACT_LOCATIONS = {'图标动画场景', '抽象示意图场景', '黑屏', '数据流动画'}
+    scene_groups = {}  # {location: [shot, shot, ...]}
+    for s in state['shots']:
+        loc = s.get('location', '')
+        if loc in ABSTRACT_LOCATIONS:
+            continue  # 抽象镜头独立出图
+        scene_groups.setdefault(loc, []).append(s)
+
+    # 收集中每个 scene 的第一镜 + 所有抽象镜头 → 需要实际生成的镜头
+    lead_shots = []  # 每个场景的第一镜
+    follow_shots = []  # 同场景的后续镜（复用首帧）
+    seen_locs = set()
+    for loc, group in scene_groups.items():
+        if loc in seen_locs:
+            continue
+        seen_locs.add(loc)
+        if group:
+            lead_shots.append(group[0])
+            for s in group[1:]:
+                follow_shots.append((s, group[0]['id']))
+
+    # 抽象镜头独立生成
+    abstract_shots = [s for s in state['shots']
+                      if s.get('location', '') in ABSTRACT_LOCATIONS and s.get('image_prompt')]
+    valid_shots = lead_shots + abstract_shots
 
     if not valid_shots:
         return jsonify({'error': '没有可用的 image_prompt'}), 400
-
-    ts = datetime.now().strftime('%Y%m%d_%H%M%S')
 
     def _gen_one(shot):
         path = os.path.join(sdir, f"{ts}_{shot['id']}_kf.png")
@@ -372,6 +435,7 @@ def session_images(session_id):
         return (shot['id'], None)
 
     try:
+        import shutil
         with ThreadPoolExecutor(max_workers=min(len(valid_shots), 5)) as ex:
             futures = {ex.submit(_gen_one, s): s['id'] for s in valid_shots}
             for f in as_completed(futures):
@@ -383,11 +447,47 @@ def session_images(session_id):
                 else:
                     failed.append(sid)
 
+        # === 同场景后续镜：复制首帧图片 ===
+        reused = 0
+        for follow, lead_id in follow_shots:
+            lead_path = None
+            for s in state['shots']:
+                if s['id'] == lead_id:
+                    lead_path = s.get('image_path')
+                    break
+            if lead_path and os.path.exists(lead_path):
+                follow_path = os.path.join(sdir, f"{ts}_{follow['id']}_kf.png")
+                shutil.copy2(lead_path, follow_path)
+                follow['image_path'] = follow_path
+                follow['image_reused_from'] = lead_id  # 标记来源
+                reused += 1
+                logger.info(f"  {follow['id']} 复用 {lead_id} 关键帧（同场景）")
+
+        # === 动作关键帧：有 peak_prompts 的镜头生成额外帧 ===
+        peak_count = 0
+        for shot in state['shots']:
+            peaks = shot.get('peak_prompts', [])
+            if not peaks or not shot.get('image_path'):
+                continue
+            for pi, peak in enumerate(peaks):
+                try:
+                    peak_path = os.path.join(sdir, f"{ts}_{shot['id']}_peak{pi}_frame.png")
+                    generate_image(model_config, peak.get('image_prompt', ''),
+                                  state['config']['resolution'], peak_path)
+                    if os.path.exists(peak_path) and os.path.getsize(peak_path) > 0:
+                        peak['frame_path'] = peak_path
+                        peak_count += 1
+                        logger.info(f"  {shot['id']} 动作帧{pi}: {peak.get('label','')}")
+                except Exception as e:
+                    logger.warning(f"  {shot['id']} 动作帧{pi} 失败: {e}")
+
+        scene_count = len(scene_groups)
         _update_state(session_id, 'IMAGES_GENERATED', shots=state['shots'],
-                       failed_shots=failed)
-        logger.info(f"图片: {len(valid_shots)-len(failed)}/{len(valid_shots)} 成功")
+                       failed_shots=failed, scene_groups=list(scene_groups.keys()))
+        logger.info(f"图片: {len(valid_shots)-len(failed)}/{len(valid_shots)} 成功, "
+                     f"{scene_count}场景, {reused}镜复用首帧, {peak_count}动作帧")
         return jsonify({'status': 'IMAGES_GENERATED', 'total': len(valid_shots),
-                       'failed': failed})
+                       'failed': failed, 'scenes': scene_count, 'reused': reused})
     except Exception as e:
         logger.error(f"图片失败: {e}", exc_info=True)
         return jsonify({'error': '图片生成失败，请重试'}), 500
@@ -411,19 +511,31 @@ def session_videos(session_id):
 
     # 配对: 同场景相邻镜头 → 首尾帧平滑过渡 / 跨场景 → 首帧硬切
     valid_shots = []
+    action_peak_chains = []  # 有动作峰值的镜头，需要首尾帧链式生成
     for i, shot in enumerate(all_shots):
         if not shot.get('image_path'):
             failed.append(shot['id'])
             continue
         ts_v = datetime.now().strftime('%Y%m%d_%H%M%S')
         out = os.path.join(sdir, f"{ts_v}_{shot['id']}.mp4")
-        # 下一镜同场景 → 用它的首帧做本镜尾帧
-        last = None
-        if i < len(all_shots)-1:
-            nxt = all_shots[i+1]
-            if nxt.get('image_path') and shot.get('location') == nxt.get('location'):
-                last = nxt['image_path']
-        valid_shots.append((shot, out, last))
+
+        # 检查是否有可用的动作峰值帧
+        peaks = shot.get('peak_prompts', [])
+        valid_peaks = [p for p in peaks if p.get('frame_path') and os.path.exists(p['frame_path'])]
+
+        if valid_peaks:
+            # 有动作峰值：构建首尾帧链 main→peak[0]→peak[1]→...
+            action_peak_chains.append((shot, out, ts_v, valid_peaks))
+            # 仍然加入 valid_shots 做正常生成（动作链在后续单独处理）
+            valid_shots.append((shot, out, None))
+        else:
+            # 下一镜同场景 → 用它的首帧做本镜尾帧
+            last = None
+            if i < len(all_shots)-1:
+                nxt = all_shots[i+1]
+                if nxt.get('image_path') and shot.get('location') == nxt.get('location'):
+                    last = nxt['image_path']
+            valid_shots.append((shot, out, last))
 
     if not valid_shots:
         return jsonify({'error': '没有可用的关键帧'}), 400
@@ -514,6 +626,75 @@ def session_videos(session_id):
                         failed.append(sid)
                     if ok: logger.info(f"  {sid} 视频完成")
 
+        # === 动作峰值链式生成：main→peak[0]→peak[1]→... ===
+        import subprocess as _sp
+        def _norm(p):
+            return os.path.abspath(p).replace('\\', '/')
+        for shot, out, ts_v, peaks in action_peak_chains:
+            try:
+                chain_clips = []
+                # 链式: main_frame → peak[0], peak[0] → peak[1], ...
+                prev_frame = shot['image_path']
+                for pi, peak in enumerate(peaks):
+                    peak_out = os.path.join(sdir, f"{ts_v}_{shot['id']}_peak{pi}.mp4")
+                    content = [
+                        {'type': 'text', 'text': peak.get('video_prompt', shot.get('video_prompt', ''))},
+                        {'type': 'image_url', 'image_url': {'url': _b64(prev_frame)}, 'role': 'first_frame'},
+                        {'type': 'image_url', 'image_url': {'url': _b64(peak['frame_path'])}, 'role': 'last_frame'}
+                    ]
+                    payload = {'model': model_config['model'], 'content': content,
+                               'duration': max(2, shot.get('final_duration', 5) // len(peaks)),
+                               'ratio': 'adaptive', 'resolution': video_quality, 'watermark': False,
+                               'seed': int(hashlib.md5(
+                                   f"{session_id}_{shot['id']}_p{pi}".encode()
+                                   ).hexdigest()[:8], 16) % (2**31)}
+                    import requests as _r
+                    resp = _r.post(api_url, json=payload,
+                                  headers={'Content-Type': 'application/json',
+                                           'Authorization': f'Bearer {api_key}'},
+                                  timeout=(10, 60))
+                    if resp.status_code == 200 and resp.json().get('id'):
+                        tid = resp.json()['id']
+                        for _ in range(120):
+                            time.sleep(10)
+                            r2 = _r.get(f"{api_url}/{tid}",
+                                       headers={'Authorization': f'Bearer {api_key}'}, timeout=30)
+                            if r2.status_code == 200:
+                                st = r2.json().get('status', '').lower()
+                                if st == 'succeeded':
+                                    vu = r2.json().get('content', {}).get('video_url', '')
+                                    if vu:
+                                        vr = _r.get(vu, timeout=120)
+                                        if vr.status_code == 200:
+                                            with open(peak_out, 'wb') as vf:
+                                                vf.write(vr.content)
+                                            chain_clips.append(peak_out)
+                                            logger.info(f"  {shot['id']} peak{pi} 视频完成")
+                                            break
+                                elif st == 'failed':
+                                    break
+                        time.sleep(10)
+
+                    prev_frame = peak['frame_path']  # 下一个 peak 的起始帧
+
+                if chain_clips:
+                    # ffmpeg 拼接所有峰值片段
+                    concat_list = os.path.join(sdir, f"{ts_v}_{shot['id']}_concat.txt")
+                    with open(concat_list, 'w') as cf:
+                        for cp in chain_clips:
+                            cf.write(f"file '{_norm(cp)}'\n")
+                    r_cat = _sp.run(['ffmpeg', '-y', '-f', 'concat', '-safe', '0',
+                                    '-i', _norm(concat_list), '-c', 'copy', _norm(out)],
+                                   capture_output=True, text=True)
+                    if r_cat.returncode == 0:
+                        shot['video_path'] = out
+                        shot['peak_frames_used'] = len(chain_clips)
+                        logger.info(f"  {shot['id']} 动作链完成: {len(chain_clips)}段 → {out}")
+                    else:
+                        logger.warning(f"  {shot['id']} 动作链拼接失败: {r_cat.stderr[:200]}")
+            except Exception as e:
+                logger.warning(f"  {shot['id']} 动作链失败: {e}")
+
         _update_state(session_id, 'VIDEOS_GENERATED', shots=state['shots'],
                        failed_shots=failed)
         return jsonify({'status': 'VIDEOS_GENERATED', 'total': len(all_shots),
@@ -546,7 +727,8 @@ def session_compose(session_id):
                     logger.warning(f"  {shot['id']} TTS失败: {e}")
 
         # 合成: 字幕+混音+拼接 (composer.py)
-        out = compose_video(sdir, state['shots'], state['config'])
+        out = compose_video(sdir, state['shots'], state['config'],
+                            global_tone=state.get('global_tone', ''))
         _update_state(session_id, 'COMPOSED', final_video=out)
         logger.info(f"合成完成: {out}")
         return jsonify({'status': 'COMPOSED',
@@ -564,7 +746,16 @@ def session_compose(session_id):
 def session_retry_failed(session_id):
     state = _load_state(session_id)
     if not state: return jsonify({'error': 'Session 不存在'}), 404
-    failed_shots = state.get('failed_shots', [])
+
+    # 支持单镜重试: ?shot_id=SC03
+    target_shot = request.args.get('shot_id', '')
+    if target_shot:
+        failed_shots = [target_shot] if any(
+            s['id'] == target_shot for s in state.get('shots', [])
+        ) else []
+    else:
+        failed_shots = state.get('failed_shots', [])
+
     if not failed_shots:
         return jsonify({'status': 'NO_FAILURES'})
 
@@ -643,7 +834,28 @@ def session_retry_failed(session_id):
                     else:
                         still.append(sid)
 
-    _update_state(session_id, status, shots=state['shots'], failed_shots=still)
+    elif status == 'COMPOSED':
+        # 重试合成（BGM/TTS/拼接可能有瞬时错误）
+        try:
+            for shot in state['shots']:
+                if shot.get('narration') and shot['narration'] != '无' and not shot.get('narration_path'):
+                    path = os.path.join(sdir, f"{shot['id']}_narration.mp3")
+                    try:
+                        generate_narration(shot['narration'], path,
+                                          voice=state['config'].get('tts_voice', 'zh-CN-XiaoxiaoNeural'))
+                        shot['narration_path'] = path
+                    except Exception as e:
+                        logger.warning(f"  {shot['id']} TTS重试失败: {e}")
+            out = compose_video(sdir, state['shots'], state['config'],
+                               global_tone=state.get('global_tone', ''))
+            state['final_video'] = out
+            retried = 1
+        except Exception as e:
+            logger.error(f"合成重试失败: {e}")
+            still.append('compose')
+
+    _update_state(session_id, status, shots=state['shots'],
+                   failed_shots=still, final_video=state.get('final_video'))
     return jsonify({'status': 'RETRIED', 'retried': retried, 'still_failed': still})
 
 

@@ -108,8 +108,8 @@
                             <div class="option-group">
                                 <label data-i18n="label_quality">视频画质</label>
                                 <select id="videoQuality" class="modern-select">
-                                    <option value="480p" data-i18n="option_quality_480">480p 标准（省钱）</option>
                                     <option value="720p" data-i18n="option_quality_720">720p 高清</option>
+                                    <option value="480p" data-i18n="option_quality_480">480p 标准（省钱）</option>
                                 </select>
                             </div>
                             <div class="option-group">
@@ -235,8 +235,11 @@
                         <div class="stat-chip" id="statChars"><span class="chip-val">-</span><span class="chip-label" data-i18n="stat_chars">角色</span></div>
                     </div>
                     <div class="shots-preview" id="shotsPreview" style="display:none;">
-                        <h4 class="shots-preview-title" data-i18n="shots_preview_title">AI 分镜设计结果</h4>
-                        <div class="shots-list" id="shotsList"></div>
+                        <div class="shots-preview-header">
+                            <h4 class="shots-preview-title" data-i18n="shots_preview_title">分镜进度</h4>
+                            <button class="retry-all-btn" id="retryAllBtn" style="display:none" data-i18n="retry_all_failed">重试全部失败</button>
+                        </div>
+                        <div class="shots-grid" id="shotsGrid"></div>
                     </div>
                 </div>
 

@@ -1,6 +1,6 @@
-"""Edge TTS 语音合成 — 免费微软中文语音（晓晓女声），异步包装为同步"""
+"""Edge TTS 语音合成 — 免费微软中文语音（晓晓女声），纯文本模式"""
 
-import os, asyncio
+import os, asyncio, re
 
 
 async def _generate_tts(text, out_path, voice="zh-CN-XiaoxiaoNeural"):
@@ -10,6 +10,10 @@ async def _generate_tts(text, out_path, voice="zh-CN-XiaoxiaoNeural"):
 
 
 def generate_narration(text, output_path, voice="zh-CN-XiaoxiaoNeural"):
-    """生成旁白 mp3。edge_tts 是异步库，用 asyncio.run() 包装为同步调用。"""
-    asyncio.run(_generate_tts(text, output_path, voice))
+    """生成旁白 mp3。剥离所有 SSML/XML 标签，纯文本朗读。"""
+    # 剥离 SSML 标签（LLM 生成的 SSML 值不可靠，会导致朗读标签文字）
+    clean = re.sub(r'<[^>]+>', '', text).strip()
+    if not clean:
+        clean = text.strip()  # fallback
+    asyncio.run(_generate_tts(clean, output_path, voice))
     return output_path

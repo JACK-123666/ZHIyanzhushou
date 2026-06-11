@@ -146,6 +146,8 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('bgmVolumeSlider').addEventListener('input', function () {
         document.getElementById('bgmVolumeLabel').textContent = this.value + '%';
     });
+
+    document.getElementById('retryAllBtn').addEventListener('click', retryAllFailed);
 });
 
 function handleFile(file) {
@@ -164,25 +166,106 @@ function handleFile(file) {
 
 function renderShotsPreview(data) {
     var panel = document.getElementById('shotsPreview');
-    var list = document.getElementById('shotsList');
-    if (!panel || !list || !data.shots_preview) return;
+    var grid = document.getElementById('shotsGrid');
+    if (!panel || !grid || !data.shots_preview) return;
     panel.style.display = 'block';
-    list.innerHTML = '';
+    grid.innerHTML = '';
     data.shots_preview.forEach(function(s) {
-        var item = document.createElement('div');
-        item.className = 'shot-item';
-        item.innerHTML =
-            '<span class="shot-id">' + s.id + '</span>' +
-            '<span class="shot-action">' + (s.action || '') + '</span>' +
-            '<span class="shot-meta">' +
-                '<span class="shot-tag duration">' + s.duration + 's</span>' +
-                '<span class="shot-tag camera">' + s.camera + '</span>' +
-                '<span class="shot-tag mood">' + s.mood + '</span>' +
-                '<span class="shot-tag location">' + s.location + '</span>' +
-            '</span>' +
-            (s.narration ? '<span class="shot-extra" title="' + s.narration + '">' + s.narration + '</span>' : '');
-        list.appendChild(item);
+        var card = document.createElement('div');
+        card.className = 'shot-card';
+        card.id = 'shotCard_' + s.id;
+        card.innerHTML =
+            '<div class="shot-card-header">' +
+                '<span class="shot-id">' + s.id + '</span>' +
+                '<span class="shot-status pending">' + t('shot_pending') + '</span>' +
+            '</div>' +
+            '<div class="shot-card-thumb" id="thumb_' + s.id + '">' +
+                '<div class="shot-card-placeholder">' +
+                    '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>' +
+                '</div>' +
+            '</div>' +
+            '<div class="shot-card-body">' +
+                '<span class="shot-action">' + (s.action || s.id) + '</span>' +
+                '<span class="shot-meta">' +
+                    '<span class="shot-tag duration">' + s.duration + 's</span>' +
+                    '<span class="shot-tag camera">' + (s.camera || '') + '</span>' +
+                    '<span class="shot-tag mood">' + (s.mood || '') + '</span>' +
+                '</span>' +
+            '</div>' +
+            '<button class="shot-retry-btn" id="retry_' + s.id + '" style="display:none" onclick="retryShot(\'' + s.id + '\')">' +
+                '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>' +
+                t('shot_retry') +
+            '</button>';
+        grid.appendChild(card);
     });
+}
+
+function updateShotStatus(shotId, status) {
+    var card = document.getElementById('shotCard_' + shotId);
+    if (!card) return;
+    var statusEl = card.querySelector('.shot-status');
+    if (statusEl) {
+        statusEl.className = 'shot-status ' + status;
+        var labels = { 'pending': t('shot_pending'), 'generating': t('shot_generating'), 'done': t('shot_done'), 'failed': t('shot_failed') };
+        statusEl.textContent = labels[status] || status;
+    }
+    var retryBtn = document.getElementById('retry_' + shotId);
+    if (retryBtn) {
+        retryBtn.style.display = status === 'failed' ? 'inline-flex' : 'none';
+    }
+}
+
+function updateShotThumb(shotId, imageUrl) {
+    var thumb = document.getElementById('thumb_' + shotId);
+    if (!thumb) return;
+    thumb.innerHTML = '<img src="' + imageUrl + '" alt="' + shotId + '" class="shot-thumb-img" loading="lazy">';
+}
+
+async function retryShot(shotId) {
+    if (!currentSessionId) return;
+    var btn = document.getElementById('retry_' + shotId);
+    if (btn) { btn.disabled = true; btn.textContent = t('shot_retrying'); }
+    updateShotStatus(shotId, 'generating');
+    try {
+        var resp = await fetch('/api/session/' + currentSessionId + '/retry-failed?shot_id=' + shotId, { method: 'POST' });
+        var data = await resp.json();
+        if (data.still_failed && data.still_failed.indexOf(shotId) >= 0) {
+            updateShotStatus(shotId, 'failed');
+        } else {
+            updateShotStatus(shotId, 'done');
+        }
+    } catch (e) {
+        updateShotStatus(shotId, 'failed');
+    }
+    if (btn) { btn.disabled = false; btn.textContent = t('shot_retry'); }
+    updateRetryAllBtn();
+}
+
+async function retryAllFailed() {
+    if (!currentSessionId) return;
+    var btn = document.getElementById('retryAllBtn');
+    if (btn) { btn.disabled = true; btn.textContent = t('retrying'); }
+    try {
+        var resp = await fetch('/api/session/' + currentSessionId + '/retry-failed', { method: 'POST' });
+        var data = await resp.json();
+        if (data.still_failed) {
+            data.still_failed.forEach(function(sid) { updateShotStatus(sid, 'failed'); });
+        }
+        if (data.retried > 0) {
+            showToast(data.retried + ' ' + t('toast_retried'), 'success');
+        }
+    } catch (e) {
+        showToast(t('toast_retry_fail'), 'error');
+    }
+    if (btn) { btn.disabled = false; btn.textContent = t('retry_all_failed'); }
+    updateRetryAllBtn();
+}
+
+function updateRetryAllBtn() {
+    var btn = document.getElementById('retryAllBtn');
+    if (!btn) return;
+    var anyFailed = document.querySelectorAll('.shot-status.failed').length > 0;
+    btn.style.display = anyFailed ? 'inline-flex' : 'none';
 }
 
 function resetAll() {
@@ -286,7 +369,9 @@ async function startPipeline() {
         data = await res.json();
         if (!res.ok) throw new Error(data.error);
         showStats(data.shot_count, data.scene_count || '-', data.character_count || '-');
-        if (data.shots_preview) renderShotsPreview(data);
+        // 保存分镜预览数据供后续步骤更新状态
+        var shotsPreview = data.shots_preview || [];
+        if (shotsPreview.length) renderShotsPreview(data);
 
         progressTitle.textContent = '生成 Prompts...';
         progressText.textContent = currentMode === 'auto' ? 'AI 自选风格 + 角色锚定 · 情绪弧线 · 叙事链'
@@ -299,10 +384,20 @@ async function startPipeline() {
         progressTitle.textContent = '并行生成关键帧...';
         progressText.textContent = 'Seedream 5.0 文生图 · 场景级关键帧共享 · 并行加速';
         updatePipelineStep('IMAGES_GENERATED');
+        // 标记所有镜头为"生成中"
+        if (shotsPreview.length) {
+            shotsPreview.forEach(function(s) { updateShotStatus(s.id, 'generating'); });
+        }
         res = await fetch('/api/session/' + currentSessionId + '/images', { method: 'POST' });
         data = await res.json();
         if (!res.ok) throw new Error(data.error);
-        if (data.failed.length > 0) showToast(data.failed.length + ' 个场景生成失败', 'error');
+        // 更新镜头状态
+        var failedIds = data.failed || [];
+        shotsPreview.forEach(function(s) {
+            updateShotStatus(s.id, failedIds.indexOf(s.id) >= 0 ? 'failed' : 'done');
+        });
+        if (data.failed.length > 0) showToast(data.failed.length + ' ' + t('toast_images_failed'), 'error');
+        updateRetryAllBtn();
 
         progressTitle.textContent = '并行生成视频片段...';
         progressText.textContent = 'Seedance 2.0 图生视频 · 并行轮询下载';
@@ -310,7 +405,10 @@ async function startPipeline() {
         res = await fetch('/api/session/' + currentSessionId + '/videos', { method: 'POST' });
         data = await res.json();
         if (!res.ok) throw new Error(data.error);
-        if (data.failed.length > 0) showToast(data.failed.length + ' 个镜头视频生成失败', 'error');
+        // 更新视频阶段失败的镜头
+        (data.failed || []).forEach(function(sid) { updateShotStatus(sid, 'failed'); });
+        if (data.failed.length > 0) showToast(data.failed.length + ' ' + t('toast_videos_failed'), 'error');
+        updateRetryAllBtn();
 
         progressTitle.textContent = '合成最终视频...';
         progressText.textContent = 'Edge TTS 中文配音 + ffmpeg 合成';

@@ -12,7 +12,7 @@ def _norm(path):
     return os.path.abspath(path).replace('\\', '/')  # ffmpeg 兼容正斜杠
 
 
-def compose_video(session_dir, shots, config):
+def compose_video(session_dir, shots, config, global_tone=''):
     """主线: 逐镜头处理(字幕+混音) → 统一音轨 → xfade拼接 → 回退硬切。"""
     processed, temps = [], []
     auto_sub = config.get('auto_subtitle', 'yes') == 'yes'
@@ -39,8 +39,8 @@ def compose_video(session_dir, shots, config):
         nar = shot.get('narration_path')
         if nar and os.path.exists(nar):
             mp = os.path.join(session_dir, f"{shot['id']}_mixed.mp4")
-            _mix_audio(cur, nar, mp, narration_volume=1.0,
-                       video_volume=max(0.1, 1.0 - vid_vol))
+            _mix_audio(cur, nar, mp, narration_volume=0.72,
+                       video_volume=max(0.08, 1.0 - vid_vol))
             cur = mp; temps.append(mp)
 
         processed.append(cur)
@@ -58,10 +58,26 @@ def compose_video(session_dir, shots, config):
             normalized.append(sp); temps.append(sp)
 
     # === 时长修正 ===
-    nar_total = sum(len(s.get('narration', '')) / 4 for s in shots)  # 中文~4字/秒
-    vid_total = sum(_get_duration(p) for p in normalized)
+    # 中文 TTS ~4字/秒；英文 narration ~3词/秒（保守估计）
+    import re as _re
+    nar_total = 0.0
+    for s in shots:
+        nar = s.get('narration', '')
+        if not nar:
+            continue
+        # 剥离 SSML 标签，只计算实际文本字数
+        nar_clean = _re.sub(r'<[^>]+>', '', nar).strip()
+        if not nar_clean:
+            continue
+        # 判断语言：含中文字符按 4字/秒，否则按英文词速
+        if any('\u4e00' <= c <= '\u9fff' for c in nar_clean):
+            nar_total += len(nar_clean) / 4.0
+        else:
+            nar_total += len(nar_clean.split()) / 3.0
 
-    if nar_total > vid_total and len(normalized) > 0:
+    vid_total = sum(max(_get_duration(p), 0.5) for p in normalized)  # 每段至少0.5s
+
+    if nar_total > vid_total and len(normalized) > 0 and nar_total > 1.0:
         last = normalized[-1]
         diff = nar_total - vid_total
         loops = int(diff / (_get_duration(last) or 5)) + 1
@@ -91,7 +107,7 @@ def compose_video(session_dir, shots, config):
             bgm_files = [f for f in os.listdir(bgm_dir) if f.endswith(('.mp3', '.wav'))]
             if bgm_files:
                 bgm_vol = int(config.get('bgm_volume', 10)) / 100.0
-                bgm_path = os.path.join(bgm_dir, bgm_files[hash(session_dir) % len(bgm_files)])
+                bgm_path = _pick_bgm(bgm_dir, bgm_files, global_tone, session_dir)
                 for i, clip_path in enumerate(normalized):
                     dur = _get_duration(clip_path)
                     bgm_clip = os.path.join(session_dir, 'bgm_{}.mp4'.format(i))
@@ -166,15 +182,31 @@ def _get_duration(fp):
 
 
 def _xfade_filter(n, dur, durations):
-    """xfade + acrossfade 滤镜链，offset = 累计时长 - crossfade时长"""
-    if n <= 1: return f'[0:v][0:a]concat=n=1:v=1:a=1[outv][outa]'
-    ac = ''.join(f'[{i}:a]' for i in range(n)) + f'acrossfade=d={dur}:c1=tri:c2=tri[outa]'
+    """xfade + acrossfade 滤镜链。
+    acrossfade 只支持 2 路输入，多路需两两链式渐入。
+    视觉: xfade 串联渐入淡出。
+    """
+    if n <= 1:
+        return f'[0:v][0:a]concat=n=1:v=1:a=1[outv][outa]'
+    if n == 2:
+        return (f'[0:a][1:a]acrossfade=d={dur}:c1=tri:c2=tri[outa];'
+                f'[0:v][1:v]xfade=transition=fade:duration={dur}:offset={durations[0]-dur}[outv]')
+
+    # n > 2: 音频两两链式渐入，最后一步直接输出 [outa]
+    ac_parts = []
+    ac_parts.append(f'[0:a][1:a]acrossfade=d={dur}:c1=tri:c2=tri[a0]')
+    for i in range(2, n - 1):
+        ac_parts.append(f'[a{i-2}][{i}:a]acrossfade=d={dur}:c1=tri:c2=tri[a{i-1}]')
+    ac_parts.append(f'[a{n-3}][{n-1}:a]acrossfade=d={dur}:c1=tri:c2=tri[outa]')
+    ac = ';'.join(ac_parts)
+
+    # 视频 xfade 串联
     accum = durations[0]
     vc = f'[0:v][1:v]xfade=transition=fade:duration={dur}:offset={durations[0]-dur}[v0]'
     for i in range(2, n):
         accum += durations[i-1] - dur
         vc += f';[v{i-2}][{i}:v]xfade=transition=fade:duration={dur}:offset={accum-dur}[v{i-1}]'
-    last = f'v{n-2}' if n > 2 else 'v0'
+    last = f'v{n-2}'
     return f'{ac};{vc};[{last}]copy[outv]'
 
 
@@ -194,11 +226,23 @@ def _burn_subtitle(vp, text, out, font_path=None):
 
     vf = (f"drawtext=text='{txt}':fontsize=28:fontcolor=white:borderw=2:"
           f"bordercolor=black@0.6:x=(w-text_w)/2:y=h-th-60")
-    # 按语言选字体，找不到则回退
+    # 按语言选字体。优先项目本地 resource/fonts/ 避免 Windows 路径冒号问题
     font_list = []
     if font_path and _os.path.exists(font_path):
         font_list.append(font_path)
-    font_list.append('/Windows/Fonts/simhei.ttf')
+    # 项目自带字体（优先，路径无冒号）
+    _project_fonts = _os.path.join(_os.path.dirname(_os.path.dirname(__file__)), 'resource', 'fonts')
+    for _fn in ['simhei.ttf', 'msyh.ttc', 'NotoSansCJK-Regular.ttc']:
+        _fp = _os.path.join(_project_fonts, _fn)
+        if _os.path.exists(_fp):
+            font_list.append(_fp)
+    # 系统字体 fallback (Linux/macOS 无冒号路径安全)
+    font_list.extend([
+        '/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc',
+        '/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc',
+        '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+        '/System/Library/Fonts/PingFang.ttc',
+    ])
     for font in font_list:
         r = subprocess.run(['ffmpeg', '-y', '-i', _norm(vp), '-vf',
             vf + f":fontfile={font}",
@@ -252,6 +296,38 @@ def _add_silent_audio(vp, out):
         '-map', '1:v', '-map', '0:a', _norm(out)], capture_output=True, text=True)
     if r.returncode != 0: raise RuntimeError(f"静音轨失败: {r.stderr[:300]}")
     return out
+
+
+def _pick_bgm(bgm_dir, bgm_files, global_tone, session_dir):
+    """根据视频情绪匹配 BGM，不回退到 hash 取模。"""
+    import os as _os
+    tone_lower = (global_tone or '').lower()
+
+    # 情绪 → bgm 文件名关键词映射
+    mood_map = {
+        'cinematic': ['cinematic', 'epic', 'dramatic'],
+        'upbeat': ['upbeat', 'happy', 'bright'],
+        'gentle': ['gentle', 'soft', 'warm'],
+        'calm': ['calm', 'peaceful', 'ambient'],
+    }
+
+    # 按情绪匹配
+    for mood, keywords in mood_map.items():
+        if any(kw in tone_lower for kw in keywords + [mood]):
+            matches = [f for f in bgm_files
+                       if any(kw in f.lower() for kw in keywords + [mood])]
+            if matches:
+                return _os.path.join(bgm_dir, matches[0])
+
+    # 回退：选与 tone 中任何关键词有交集的 bgm
+    tone_words = set(tone_lower.replace(',', ' ').split())
+    for f in bgm_files:
+        f_words = set(f.lower().replace('.mp3', '').replace('.wav', '').split('_'))
+        if tone_words & f_words:
+            return _os.path.join(bgm_dir, f)
+
+    # 最终回退
+    return _os.path.join(bgm_dir, bgm_files[hash(session_dir) % len(bgm_files)])
 
 
 def _cleanup(files):

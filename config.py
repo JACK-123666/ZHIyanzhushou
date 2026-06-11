@@ -36,10 +36,12 @@ DURATION_MODES = {
 
 # --- 图片分辨率（Seedream 出图尺寸） ---
 
+# Seedream 要求最低 3686400 像素 (~3.7MP)，即 2560x1440+
+# size 参数使用 WIDTHxHEIGHT 格式
 RESOLUTIONS = {
-    '1920x1080': {'label': '1920x1080 (16:9)', 'width': 1920, 'height': 1080, 'ratio': '16:9', 'size': '2K'},
-    '1024x1024': {'label': '1024x1024 (1:1)',  'width': 1024, 'height': 1024, 'ratio': '1:1',  'size': '1K'},
-    '1080x1920': {'label': '1080x1920 (9:16)', 'width': 1080, 'height': 1920, 'ratio': '9:16', 'size': '2K'},
+    '1920x1080': {'label': '1920x1080 (16:9)', 'width': 2560, 'height': 1440, 'ratio': '16:9', 'size': '2560x1440'},
+    '1024x1024': {'label': '1024x1024 (1:1)',  'width': 2048, 'height': 2048, 'ratio': '1:1',  'size': '2048x2048'},
+    '1080x1920': {'label': '1080x1920 (9:16)', 'width': 1440, 'height': 2560, 'ratio': '9:16', 'size': '1440x2560'},
 }
 
 # --- AI 模型配置 ---
@@ -107,6 +109,8 @@ AUTO_MODE_DEFAULTS = {
     'auto_subtitle': 'yes',
     'auto_sfx': 'no',
     'original_audio_level': 20,
+    'bgm_enabled': 'yes',
+    'bgm_volume': 12,
 }
 
 # 总时长选项：0 = AI 自主决定
