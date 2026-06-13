@@ -1,6 +1,6 @@
 <p align="center">
   <h1 align="center">🎬 Zhiyan</h1>
-  <p align="center"><strong>上传文档 → AI 全自动生成视频</strong></p>
+  <p align="center"><strong>Upload a story. Get a film.</strong></p>
   <p align="center">
     <img src="https://img.shields.io/badge/python-3.10+-blue" alt="Python">
     <img src="https://img.shields.io/badge/license-Apache%202.0-green" alt="License">
@@ -10,39 +10,39 @@
 
 ---
 
-你写故事，Zhiyan 把它拍成电影。
+You write the story. Zhiyan directs, shoots, and edits it — fully automated, from script to finished video.
 
-不是"帮你生成一段视频素材"，而是从分镜到成片的全自动导演 —— LLM 读剧本、设计镜头、调度三个 AI 模型协同工作，几分钟输出带配音、字幕、BGM 的完整 mp4。
+Not "generate a video clip." A complete short film: shot-by-shot storyboarding, character-consistent keyframes, video generation with native audio, voice narration, subtitles, background music, and final composition — all in one pipeline.
 
 ```mermaid
 flowchart LR
-    A[📄 上传文档<br/>.txt / .docx] --> B[🧠 DeepSeek<br/>分镜设计]
-    B --> C[🎨 Seedream<br/>逐镜出图]
-    C --> D[🎥 Seedance<br/>图生视频+音频]
-    D --> E[🎙️ Edge TTS<br/>配音+字幕]
-    E --> F[🎬 ffmpeg 合成<br/>→ .mp4]
+    A[📄 Upload<br/>.txt / .docx] --> B[🧠 DeepSeek<br/>Storyboarding]
+    B --> C[🎨 Seedream<br/>Keyframes]
+    C --> D[🎥 Seedance<br/>Video + Audio]
+    D --> E[🎙️ Edge TTS<br/>Narration]
+    E --> F[🎬 ffmpeg<br/>→ .mp4]
 ```
 
-## 🤖 Agent 模式：AI 自己当导演
+## 🤖 Agent Mode
 
-除了点击流水线，Zhiyan 内置了一个 **ReAct Agent 引擎**。勾选「Agent 自主模式」后，LLM 接管一切决策：
+Beyond the linear pipeline, Zhiyan ships with a **ReAct Agent engine**. Toggle "Agent Mode" and the LLM takes full control:
 
-- 自己判断下一步该做什么（而不是固定 6 步走到底）
-- 遇到 API 限流 → 自动等待重试
-- 某个镜头一直失败 → 判断是否关键镜头，决定跳过或修改 prompt
-- 所有决策通过 SSE 实时推流到前端，你能看到它在"想"什么
+- Decides *what to do next* — not a fixed 6-step sequence
+- API rate-limited? Waits and retries automatically
+- A shot keeps failing? Evaluates importance — skip if transitional, fix prompt if critical
+- All decisions streamed to the frontend via SSE in real time
 
 ```mermaid
 flowchart TD
-    A[📊 观察当前状态] --> B[💭 LLM 分析决策]
-    B --> C[🔧 调用工具]
-    C --> D{成功?}
-    D -->|✅| E[记录结果，下一步]
-    D -->|❌| F[分类失败原因]
-    F -->|限流| G1[等待15-60s重试]
-    F -->|网络| G2[递增等待重试]
-    F -->|质量| G3[评估镜头重要性]
-    F -->|配置| G4[终止并提示]
+    A[📊 Observe state] --> B[💭 LLM analysis]
+    B --> C[🔧 Execute tool]
+    C --> D{Success?}
+    D -->|✅| E[Record, continue]
+    D -->|❌| F[Classify failure]
+    F -->|rate_limit| G1[Wait 15–60s, retry]
+    F -->|network| G2[Escalating wait, retry]
+    F -->|quality| G3[Assess importance]
+    F -->|config| G4[Abort with hint]
     G1 --> C
     G2 --> C
     G3 --> E
@@ -52,64 +52,61 @@ flowchart TD
 ## 🚀 Quick Start
 
 ```bash
-# 1. 安装
+# 1. Install dependencies
 pip install -r requirements.txt
 
-# ffmpeg 需系统安装（视频合成用）
+# ffmpeg is required (video composition)
 # macOS:  brew install ffmpeg
 # Ubuntu: apt install ffmpeg
-# Win:    choco install ffmpeg 或手动下载
+# Win:    choco install ffmpeg
 
-# 2. 配置 API Key
+# 2. Configure API keys
 cp .env.example .env
-# 编辑 .env 填入两个 Key:
-#   ARK_API_KEY=...        (火山引擎方舟)
+# Edit .env — you need two keys:
+#   ARK_API_KEY=...        (Volcengine ARK)
 #   DEEPSEEK_API_KEY=...   (DeepSeek)
 
-# 3. 启动
+# 3. Run
 python app.py
-# 浏览器打开 http://localhost:5000
+# Open http://localhost:5000
 ```
 
-| 你需要什么 | 去哪获取 |
-|-----------|---------|
-| ARK_API_KEY | [火山引擎方舟](https://console.volcengine.com/ark) → API Key 管理 |
-| SEEDREAM_ENDPOINT | 方舟 → 模型推理 → 创建 Seedream 5.0 端点 |
-| SEEDANCE_ENDPOINT | 方舟 → 模型推理 → 创建 Seedance 2.0 端点 |
-| DEEPSEEK_API_KEY | [DeepSeek 开放平台](https://platform.deepseek.com) → API Keys |
+| You need | Where to get it |
+|----------|-----------------|
+| ARK_API_KEY | [Volcengine ARK Console](https://console.volcengine.com/ark) → API Keys |
+| SEEDREAM_ENDPOINT | ARK → Inference → Create Seedream 5.0 endpoint |
+| SEEDANCE_ENDPOINT | ARK → Inference → Create Seedance 2.0 endpoint |
+| DEEPSEEK_API_KEY | [DeepSeek Platform](https://platform.deepseek.com) → API Keys |
 
-## 📖 使用
+## 📖 Usage
 
-### 浏览器
+### Browser
 
-1. 打开 `http://localhost:5000`
-2. 选择模式 → 拖入文档 → 点击「开始生成」
-3. 等待流水线完成，下载视频
+1. Open `http://localhost:5000`
+2. Choose mode, drag in a `.txt` or `.docx` file
+3. Click "Generate" and wait for the pipeline to finish
+4. Download the final video
 
 ### API
-
-如果你想在自己的应用里调用：
 
 ```python
 import requests
 
-# 上传文档
+# Upload document
 r = requests.post('http://localhost:5000/api/session/create',
     files={'file': open('story.txt', 'rb')},
     data={'mode': 'auto', 'total_duration': 'auto'})
 sid = r.json()['session_id']
 
-# 逐步推进流水线
+# Step through the pipeline
 for step in ['design-shots', 'prompts', 'images', 'videos', 'compose']:
     requests.post(f'http://localhost:5000/api/session/{sid}/{step}')
 
-# 下载成品
+# Download the result
 requests.get(f'http://localhost:5000/api/session/{sid}/download')
 ```
 
-完整 API 端点见下方。
-
-## 🏗️ 架构
+## 🏗️ Architecture
 
 ```
 story.txt
@@ -118,74 +115,74 @@ story.txt
 ┌─────────────────────────────────────────────────┐
 │                 Zhiyan Pipeline                  │
 │                                                  │
-│  ① 文档解析 ──▶ ② 分镜设计 ──▶ ③ Prompt 生成   │
-│       │              │               │           │
-│       ▼              ▼               ▼           │
-│   python-docx    DeepSeek V4    视觉圣经+逐镜    │
-│                                                  │
-│  ④ 图片生成 ──▶ ⑤ 视频生成 ──▶ ⑥ 合成输出      │
-│       │              │               │           │
-│       ▼              ▼               ▼           │
-│   Seedream 5.0  Seedance 2.0    ffmpeg xfade     │
-│   同场景复用     原生音频生成    + 字幕 + BGM    │
-│   5线程并行      20线程并发                       │
+│  ① Parse ──────▶ ② Storyboard ──▶ ③ Prompts     │
+│      │                │               │          │
+│      ▼                ▼               ▼          │
+│  python-docx     DeepSeek V4    Visual Bible +   │
+│                                 per-shot prompt  │
+│  ④ Keyframes ──▶ ⑤ Video ──────▶ ⑥ Compose     │
+│      │                │               │          │
+│      ▼                ▼               ▼          │
+│  Seedream 5.0    Seedance 2.0   ffmpeg xfade     │
+│  scene reuse     native audio    + subtitles     │
+│  5-thread pool   20-thread pool  + BGM           │
 └─────────────────────────────────────────────────┘
     │
     ▼
   video.mp4
 ```
 
-## 📁 项目结构
+## 📁 Project Structure
 
 ```
-├── app.py                Flask 主程序 + API
-├── config.py             模型/风格/分辨率/多语言
-├── agent/                Agent 模式 (ReAct)
-│   ├── core.py             ZhiyanAgent 决策循环
-│   ├── tools.py            10 个工具注册与实现
-│   ├── memory.py           镜头状态机 + 工作记忆
-│   ├── planner.py          失败重规划 + 决策反思
-│   ├── execution_plan.py   多阶段执行计划
-│   └── state_summary.py    智能状态摘要
-├── services/             核心服务
-│   ├── llm_service.py      DeepSeek + Prompt 工程
-│   ├── image_generator.py  Seedream 文生图
-│   ├── pipeline.py         Seedance API 封装
-│   ├── tts_service.py      Edge TTS
-│   ├── composer.py         ffmpeg 合成
-│   └── document_parser.py  .txt/.docx 解析
-├── index.html / script.js / styles.css   前端 SPA
+├── app.py                Flask app + API endpoints
+├── config.py             Models, styles, resolutions, i18n
+├── agent/                Agent mode (ReAct)
+│   ├── core.py             ZhiyanAgent decision loop
+│   ├── tools.py            10-tool registry
+│   ├── memory.py           Shot state machine
+│   ├── planner.py          Failure replan + reflection
+│   ├── execution_plan.py   Multi-phase plan tracking
+│   └── state_summary.py    Smart state summary
+├── services/             Core services
+│   ├── llm_service.py      DeepSeek + prompt engineering
+│   ├── image_generator.py  Seedream text-to-image
+│   ├── pipeline.py         Seedance API wrapper
+│   ├── tts_service.py      Edge TTS narration
+│   ├── composer.py         ffmpeg video composition
+│   └── document_parser.py  .txt/.docx parsing
+├── index.html / script.js / styles.css   Frontend SPA
 └── i18n/                  zh / en / ja / ko
 ```
 
-## 📊 成本
+## 📊 Cost
 
-以愚公移山为例（8 镜 × 38 秒，720p，2025 年 API 定价）：
+Estimated for a ~40-second short film (8 shots, 720p, 2025 API pricing):
 
-| 步骤 | 调用 | 费用 |
-|------|------|------|
-| 图片 | 5 次（3 次复用节省） | ~$0.10 |
-| 视频 | 38 秒 | ~$4.56 |
-| LLM | 3 次 | ~$0.02 |
-| 配音 | Edge TTS | 免费 |
-| **合计** | | **~$4.70** |
+| Step | Usage | Cost |
+|------|-------|------|
+| Images | 5 API calls (3 reused) | ~$0.10 |
+| Video | 38 seconds | ~$4.56 |
+| LLM | 3 calls | ~$0.02 |
+| Narration | Edge TTS | Free |
+| **Total** | | **~$4.70** |
 
-启动后在分镜设计阶段即可看到预估成本，不需要等全部跑完才知道花了多少钱。
+Cost estimate is displayed during the storyboarding phase — no surprises.
 
-## 🔗 API 端点
+## 🔗 API Reference
 
-| 端点 | 说明 |
-|------|------|
-| `POST /api/session/create` | 上传文档，创建会话 |
-| `POST /api/session/<id>/design-shots` | DeepSeek 分镜设计 |
-| `POST /api/session/<id>/prompts` | 生成 image/video prompt |
-| `POST /api/session/<id>/images` | Seedream 并发出图 |
-| `POST /api/session/<id>/videos` | Seedance 并发生视频 |
-| `POST /api/session/<id>/compose` | TTS + ffmpeg 合成 |
-| `GET /api/session/<id>/status` | 进度 + 成本预估 |
-| `GET /api/session/<id>/download` | 下载成品 mp4 |
-| `GET /api/agent/<id>/stream` | Agent SSE 思考流 |
-| `GET /api/agent/<id>/state` | Agent 状态查询 |
+| Endpoint | Description |
+|----------|-------------|
+| `POST /api/session/create` | Upload document, create session |
+| `POST /api/session/<id>/design-shots` | LLM storyboard design |
+| `POST /api/session/<id>/prompts` | Generate image/video prompts |
+| `POST /api/session/<id>/images` | Parallel keyframe generation |
+| `POST /api/session/<id>/videos` | Parallel video generation |
+| `POST /api/session/<id>/compose` | TTS + ffmpeg composition |
+| `GET /api/session/<id>/status` | Progress + cost estimate |
+| `GET /api/session/<id>/download` | Download final mp4 |
+| `GET /api/agent/<id>/stream` | Agent SSE thought stream |
+| `GET /api/agent/<id>/state` | Agent state query |
 
 ## 📄 License
 
