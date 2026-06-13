@@ -3,7 +3,7 @@
   <p align="center"><strong>上传文档 → AI 全自动生成视频</strong></p>
   <p align="center">
     <img src="https://img.shields.io/badge/python-3.10+-blue" alt="Python">
-    <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
+    <img src="https://img.shields.io/badge/license-Apache%202.0-green" alt="License">
     <img src="https://img.shields.io/badge/PRs-welcome-brightgreen" alt="PRs">
   </p>
 </p>
@@ -189,4 +189,4 @@ story.txt
 
 ## 📄 License
 
-MIT — 随便用，改，分发。
+Apache 2.0
