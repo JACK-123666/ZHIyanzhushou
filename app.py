@@ -1,7 +1,4 @@
-"""
-智演助手 1.5 — 故事文档 → AI视频，6步全自动流水线
-DeepSeek(剧本) → Seedream(出图) → Seedance(视频) → ffmpeg(合成)
-"""
+"""Zhiyan — 故事文档 → AI视频，6步全自动"""
 
 import os, json, uuid, time, hashlib, threading
 from datetime import datetime
@@ -22,9 +19,10 @@ from services.image_generator import generate_image
 from services.tts_service import generate_narration
 from services.composer import compose_video
 from services.trend_service import get_trending_techniques, search_techniques
+from agent import ZhiyanAgent, WorkingMemory
 
 logger = setup_logger('app')
-logger.info("智演助手 1.5 启动")
+logger.info("Zhiyan 1.5 启动")
 
 # --- Flask 初始化 ---
 app = Flask(__name__)
@@ -67,7 +65,7 @@ def _login_page(error=''):
     return f'''<!DOCTYPE html>
 <html lang="zh-CN">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>登录 - 智演助手</title>
+<title>登录 - Zhiyan</title>
 <style>
 *{{margin:0;padding:0;box-sizing:border-box}}
 body{{display:flex;justify-content:center;align-items:center;min-height:100vh;background:#f0f2f5;font-family:-apple-system,sans-serif}}
@@ -78,7 +76,7 @@ input:focus{{border-color:#3498db}}
 button{{width:100%;padding:12px;background:#3498db;color:#fff;border:none;border-radius:8px;font-size:1rem;cursor:pointer;font-weight:600}}
 button:hover{{background:#2980b9}}
 </style></head>
-<body><div class="box"><h1>智演助手</h1>{err_html}
+<body><div class="box"><h1>Zhiyan</h1>{err_html}
 <form method="post" action="/login"><input type="password" name="token" placeholder="访问密码" autofocus>
 <button type="submit">登 录</button></form></div></body></html>'''
 
@@ -176,9 +174,7 @@ def static_files(filename):
     return jsonify({'error': 'Not found'}), 404
 
 
-# =========================================================================
-# Step 1: 上传文档 → 创建会话
-# =========================================================================
+# --- 上传 + 创建会话 ---
 
 @app.route('/api/session/create', methods=['POST'])
 def session_create():
@@ -250,9 +246,7 @@ def session_create():
     return jsonify({'session_id': session_id, 'status': 'UPLOADED', 'config': config})
 
 
-# =========================================================================
-# Step 2: DeepSeek 通读文档 → 自动设计分镜
-# =========================================================================
+# --- 分镜设计 ---
 
 @app.route('/api/session/<session_id>/design-shots', methods=['POST'])
 def session_design_shots(session_id):
@@ -275,13 +269,23 @@ def session_design_shots(session_id):
                 state['config']['visual_style_directive'] = directive
                 logger.info(f"AI 自主风格: {directive[:80]}...")
 
-        # 时长策略: ai_design=AI分配 / uniform=全5s / auto_split=上限8s
-        dur_mode = state['config']['duration_mode']
+        # LLM 已按剧本节奏分配时长，不再硬编码覆盖
         for s in shots:
-            orig = s.get('original_duration')
-            s['final_duration'] = (5 if dur_mode == 'uniform'
-                                   else (orig if orig and orig <= 8 else 8) if dur_mode == 'auto_split'
-                                   else (orig or 5))
+            s['final_duration'] = s.get('original_duration') or 5
+
+        # 成本控制：超过上限则截断
+        from config import MAX_SHOTS_FOR_COST, MAX_SHOT_DURATION, COST_PER_IMAGE, COST_PER_VIDEO_SEC
+        if len(shots) > MAX_SHOTS_FOR_COST:
+            logger.warning(f"镜头数 {len(shots)} 超过成本上限 {MAX_SHOTS_FOR_COST}，截断")
+            shots = shots[:MAX_SHOTS_FOR_COST]
+        for s in shots:
+            if s.get('final_duration', 5) > MAX_SHOT_DURATION:
+                s['final_duration'] = MAX_SHOT_DURATION
+
+        total_sec = sum(s.get('final_duration', 5) for s in shots)
+        est_cost = len(shots) * COST_PER_IMAGE + total_sec * COST_PER_VIDEO_SEC
+        state['estimated_cost_usd'] = round(est_cost, 2)
+        logger.info(f"预估成本: ${est_cost:.2f} ({len(shots)}镜 {total_sec}秒)")
 
         _update_state(session_id, 'SHOTS_DESIGNED', shots=shots,
                        scene_map=scene_map, title=result.get('title', ''),
@@ -295,6 +299,7 @@ def session_design_shots(session_id):
             'shot_count': len(shots), 'scene_count': len(scene_map),
             'character_count': len(character_summary),
             'title': result.get('title', ''),
+            'estimated_cost_usd': state.get('estimated_cost_usd', 0),
             'shots_preview': [{'id': s['id'], 'duration': s.get('final_duration', 5),
                                'camera': s.get('camera_hint', ''), 'mood': s.get('mood', ''),
                                'location': s.get('location', ''),
@@ -306,9 +311,7 @@ def session_design_shots(session_id):
         return jsonify({'error': '分镜设计失败，请重试'}), 500
 
 
-# =========================================================================
-# Step 3: 两轮 Prompt — 视觉圣经 + 逐镜头生成
-# =========================================================================
+# --- Prompt 生成 ---
 
 @app.route('/api/session/<session_id>/prompts', methods=['POST'])
 def session_prompts(session_id):
@@ -336,9 +339,7 @@ def session_prompts(session_id):
         return jsonify({'error': 'Prompt生成失败，请重试'}), 500
 
 
-# =========================================================================
-# Step 4: Seedream 文生图 — 同场景首帧复用 + 并行生成（5线程并行）
-# =========================================================================
+# --- 图片生成 (Seedream) ---
 
 @app.route('/api/session/<session_id>/images', methods=['POST'])
 def session_images(session_id):
@@ -493,9 +494,7 @@ def session_images(session_id):
         return jsonify({'error': '图片生成失败，请重试'}), 500
 
 
-# =========================================================================
-# Step 5: Seedance 图生视频 — 首帧/首尾帧智能模式（10线程并行）
-# =========================================================================
+# --- 视频生成 (Seedance) ---
 
 @app.route('/api/session/<session_id>/videos', methods=['POST'])
 def session_videos(session_id):
@@ -541,144 +540,87 @@ def session_videos(session_id):
         return jsonify({'error': '没有可用的关键帧'}), 400
 
     try:
+        from services.pipeline import (
+            image_to_base64_dataurl, build_seedance_payload,
+            create_seedance_task, poll_seedance_task, download_video,
+        )
         api_key = model_config['api_key']
         api_url = model_config['api_url']
+        model_name = model_config['model']
+        result_lock = threading.Lock()
 
-        def _b64(path):
-            import base64
-            with open(path, 'rb') as f:
-                b64 = base64.b64encode(f.read()).decode()
-            ext = os.path.splitext(path)[1].lower()
-            mime = 'image/png' if ext == '.png' else 'image/jpeg'
-            return f"data:{mime};base64,{b64}"
+        def _submit_and_poll(shot_entry):
+            """提交任务 → 立即轮询，一线到底，不拆两阶段"""
+            shot, out, last = shot_entry
+            try:
+                payload = build_seedance_payload(
+                    model=model_name,
+                    first_frame_path=shot['image_path'],
+                    video_prompt=shot.get('video_prompt', ''),
+                    duration=shot.get('final_duration', 5),
+                    resolution=video_quality,
+                    seed_session_id=f"{session_id}_{shot['id']}",
+                    last_frame_path=last,
+                )
+                tid = create_seedance_task(api_url, api_key, payload)
+                if not tid:
+                    with result_lock:
+                        failed.append(shot['id'])
+                    return
 
-        # Phase 1: 并行创建任务
-        task_map = {}
-
-        def _create(shot, out, last):
-            import requests as r
-            content = [
-                {'type': 'text', 'text': shot.get('video_prompt', '')},
-                {'type': 'image_url', 'image_url': {'url': _b64(shot['image_path'])},
-                 'role': 'first_frame'}
-            ]
-            if last:
-                content.append({'type': 'image_url', 'image_url': {'url': _b64(last)},
-                               'role': 'last_frame'})
-
-            payload = {'model': model_config['model'], 'content': content,
-                       'duration': shot.get('final_duration', 5),
-                       'ratio': 'adaptive', 'resolution': video_quality,
-                       'watermark': False,
-                       'seed': int(hashlib.md5(
-                           f"{session_id}_{shot['id']}".encode()).hexdigest()[:8], 16) % (2**31)}
-
-            resp = r.post(api_url, json=payload,
-                         headers={'Content-Type': 'application/json',
-                                  'Authorization': f'Bearer {api_key}'},
-                         timeout=(10, 60))
-            if resp.status_code == 200:
-                tid = resp.json().get('id')
-                if tid:
-                    return (tid, shot, out, '首尾帧' if last else '首帧')
-            return (None, shot, out, '')
-
-        with ThreadPoolExecutor(max_workers=min(len(valid_shots), 10)) as ex:
-            for f in as_completed([ex.submit(_create, s, o, l) for s, o, l in valid_shots]):
-                tid, shot, out, mode = f.result()
-                if tid:
-                    task_map[tid] = (shot, out)
-                    logger.info(f"  {shot['id']}: {mode} -> {tid}")
-                else:
+                poll_result = poll_seedance_task(api_url, api_key, tid)
+                if poll_result['status'] == 'succeeded' and poll_result['video_url']:
+                    if download_video(poll_result['video_url'], out):
+                        shot['video_path'] = out
+                        logger.info(f"  {shot['id']} 视频完成")
+                        return
+                with result_lock:
+                    failed.append(shot['id'])
+            except Exception as e:
+                logger.warning(f"  {shot['id']} 异常: {e}")
+                with result_lock:
                     failed.append(shot['id'])
 
-        # Phase 2: 并行轮询 + 下载
-        if task_map:
-            def _poll(tid, shot, out):
-                import requests as r
-                h = {'Authorization': f'Bearer {api_key}'}
-                for _ in range(120):  # 最长等20分钟
-                    try:
-                        resp = r.get(f"{api_url}/{tid}", headers=h, timeout=30)
-                        if resp.status_code != 200:
-                            time.sleep(10); continue
-                        st = resp.json().get('status', '').lower()
-                        if st == 'succeeded':
-                            vu = resp.json().get('content', {}).get('video_url', '')
-                            if vu and r.get(vu, timeout=120).status_code == 200:
-                                with open(out, 'wb') as vf:
-                                    vf.write(r.get(vu, timeout=120).content)
-                                shot['video_path'] = out
-                                return (shot['id'], True)
-                            return (shot['id'], False)
-                        if st == 'failed':
-                            return (shot['id'], False)
-                        time.sleep(10)
-                    except Exception:
-                        time.sleep(10)
-                return (shot['id'], False)
+        # 20 线程并行：提交+轮询一步到位
+        MAX_VIDEO_WORKERS = 20
+        with ThreadPoolExecutor(max_workers=min(len(valid_shots), MAX_VIDEO_WORKERS)) as ex:
+            list(ex.map(_submit_and_poll, valid_shots))
 
-            with ThreadPoolExecutor(max_workers=min(len(task_map), 10)) as ex:
-                for f in as_completed([ex.submit(_poll, tid, s, o)
-                                       for tid, (s, o) in task_map.items()]):
-                    sid, ok = f.result()
-                    if not ok:
-                        failed.append(sid)
-                    if ok: logger.info(f"  {sid} 视频完成")
+        # === 动作峰值链 — 并行化 ===
+        if action_peak_chains:
+            import subprocess as _sp
+            def _norm(p):
+                return os.path.abspath(p).replace('\\', '/')
 
-        # === 动作峰值链式生成：main→peak[0]→peak[1]→... ===
-        import subprocess as _sp
-        def _norm(p):
-            return os.path.abspath(p).replace('\\', '/')
-        for shot, out, ts_v, peaks in action_peak_chains:
-            try:
+            def _gen_peak_chain(shot, out, ts_v, peaks):
+                """每个峰值段也是提交→立即轮询"""
                 chain_clips = []
-                # 链式: main_frame → peak[0], peak[0] → peak[1], ...
                 prev_frame = shot['image_path']
                 for pi, peak in enumerate(peaks):
-                    peak_out = os.path.join(sdir, f"{ts_v}_{shot['id']}_peak{pi}.mp4")
-                    content = [
-                        {'type': 'text', 'text': peak.get('video_prompt', shot.get('video_prompt', ''))},
-                        {'type': 'image_url', 'image_url': {'url': _b64(prev_frame)}, 'role': 'first_frame'},
-                        {'type': 'image_url', 'image_url': {'url': _b64(peak['frame_path'])}, 'role': 'last_frame'}
-                    ]
-                    payload = {'model': model_config['model'], 'content': content,
-                               'duration': max(2, shot.get('final_duration', 5) // len(peaks)),
-                               'ratio': 'adaptive', 'resolution': video_quality, 'watermark': False,
-                               'seed': int(hashlib.md5(
-                                   f"{session_id}_{shot['id']}_p{pi}".encode()
-                                   ).hexdigest()[:8], 16) % (2**31)}
-                    import requests as _r
-                    resp = _r.post(api_url, json=payload,
-                                  headers={'Content-Type': 'application/json',
-                                           'Authorization': f'Bearer {api_key}'},
-                                  timeout=(10, 60))
-                    if resp.status_code == 200 and resp.json().get('id'):
-                        tid = resp.json()['id']
-                        for _ in range(120):
-                            time.sleep(10)
-                            r2 = _r.get(f"{api_url}/{tid}",
-                                       headers={'Authorization': f'Bearer {api_key}'}, timeout=30)
-                            if r2.status_code == 200:
-                                st = r2.json().get('status', '').lower()
-                                if st == 'succeeded':
-                                    vu = r2.json().get('content', {}).get('video_url', '')
-                                    if vu:
-                                        vr = _r.get(vu, timeout=120)
-                                        if vr.status_code == 200:
-                                            with open(peak_out, 'wb') as vf:
-                                                vf.write(vr.content)
-                                            chain_clips.append(peak_out)
-                                            logger.info(f"  {shot['id']} peak{pi} 视频完成")
-                                            break
-                                elif st == 'failed':
-                                    break
-                        time.sleep(10)
-
-                    prev_frame = peak['frame_path']  # 下一个 peak 的起始帧
+                    try:
+                        peak_out = os.path.join(sdir, f"{ts_v}_{shot['id']}_peak{pi}.mp4")
+                        payload = build_seedance_payload(
+                            model=model_name,
+                            first_frame_path=prev_frame,
+                            video_prompt=peak.get('video_prompt', shot.get('video_prompt', '')),
+                            duration=max(2, shot.get('final_duration', 5) // len(peaks)),
+                            resolution=video_quality,
+                            seed_session_id=f"{session_id}_{shot['id']}_p{pi}",
+                            last_frame_path=peak['frame_path'],
+                        )
+                        tid = create_seedance_task(api_url, api_key, payload)
+                        if not tid:
+                            continue
+                        poll_result = poll_seedance_task(api_url, api_key, tid)
+                        if poll_result['status'] == 'succeeded' and poll_result['video_url']:
+                            if download_video(poll_result['video_url'], peak_out):
+                                chain_clips.append(peak_out)
+                                logger.info(f"  {shot['id']} peak{pi} 完成")
+                        prev_frame = peak['frame_path']
+                    except Exception as e:
+                        logger.warning(f"  {shot['id']} peak{pi} 失败: {e}")
 
                 if chain_clips:
-                    # ffmpeg 拼接所有峰值片段
                     concat_list = os.path.join(sdir, f"{ts_v}_{shot['id']}_concat.txt")
                     with open(concat_list, 'w') as cf:
                         for cp in chain_clips:
@@ -689,11 +631,21 @@ def session_videos(session_id):
                     if r_cat.returncode == 0:
                         shot['video_path'] = out
                         shot['peak_frames_used'] = len(chain_clips)
-                        logger.info(f"  {shot['id']} 动作链完成: {len(chain_clips)}段 → {out}")
+                        logger.info(f"  {shot['id']} 动作链 {len(chain_clips)}段 完成")
                     else:
-                        logger.warning(f"  {shot['id']} 动作链拼接失败: {r_cat.stderr[:200]}")
-            except Exception as e:
-                logger.warning(f"  {shot['id']} 动作链失败: {e}")
+                        logger.warning(f"  {shot['id']} 拼接失败: {r_cat.stderr[:200]}")
+                return shot
+
+            # 所有动作链并行
+            peak_futures = []
+            with ThreadPoolExecutor(max_workers=min(len(action_peak_chains), 8)) as ex:
+                for shot, out, ts_v, peaks in action_peak_chains:
+                    peak_futures.append(ex.submit(_gen_peak_chain, shot, out, ts_v, peaks))
+                for f in as_completed(peak_futures):
+                    try:
+                        f.result()
+                    except Exception as e:
+                        logger.warning(f"动作链异常: {e}")
 
         _update_state(session_id, 'VIDEOS_GENERATED', shots=state['shots'],
                        failed_shots=failed)
@@ -704,9 +656,7 @@ def session_videos(session_id):
         return jsonify({'error': '视频生成失败，请重试'}), 500
 
 
-# =========================================================================
-# Step 6: TTS旁白 + 字幕 + 合成
-# =========================================================================
+# --- 配音 + 合成 ---
 
 @app.route('/api/session/<session_id>/compose', methods=['POST'])
 def session_compose(session_id):
@@ -738,9 +688,7 @@ def session_compose(session_id):
         return jsonify({'error': '视频合成失败，请重试'}), 500
 
 
-# =========================================================================
-# 失败重试 & 下载 & 状态
-# =========================================================================
+# --- 重试 / 下载 / 状态 ---
 
 @app.route('/api/session/<session_id>/retry-failed', methods=['POST'])
 def session_retry_failed(session_id):
@@ -859,9 +807,7 @@ def session_retry_failed(session_id):
     return jsonify({'status': 'RETRIED', 'retried': retried, 'still_failed': still})
 
 
-# =========================================================================
-# /rerun: 从指定步骤重跑流水线 (design / prompts / images)
-# =========================================================================
+# --- 重跑流水线 ---
 
 @app.route('/api/session/<session_id>/rerun', methods=['POST'])
 def session_rerun(session_id):
@@ -884,12 +830,8 @@ def session_rerun(session_id):
                 content = parse_document(state['filepath'])
                 result = design_shots_from_document(content, state['config'])
                 shots = result.get('shots', [])
-                dur_mode = state['config']['duration_mode']
                 for s in shots:
-                    orig = s.get('original_duration')
-                    s['final_duration'] = (5 if dur_mode == 'uniform'
-                        else (orig if orig and orig <= 8 else 8) if dur_mode == 'auto_split'
-                        else (orig or 5))
+                    s['final_duration'] = s.get('original_duration') or 5
                 if state['config'].get('mode') == 'auto':
                     directive = result.get('visual_style_directive', '')
                     if directive:
@@ -985,17 +927,17 @@ def session_status(session_id):
     step_detail = '{} ({}/{})'.format(status,
         sum(1 for s in shots if s.get('video_path')), total) if status in ('IMAGES_GENERATED','VIDEOS_GENERATED') else status
 
+    est_cost = state.get('estimated_cost_usd', 0)
     return jsonify({
         'session_id': session_id, 'status': status, 'progress': progress,
         'step_detail': step_detail,
         'stats': {'shots_done': sum(1 for s in shots if s.get('image_path')),
-                  'shots_total': total}
+                  'shots_total': total},
+        'estimated_cost_usd': est_cost,
     })
 
 
-# =========================================================================
-# 智演助手集成: /api/trends — 剪辑趋势查询
-# =========================================================================
+# --- 剪辑趋势 API ---
 
 @app.route('/api/trends')
 def api_trends():
@@ -1022,6 +964,153 @@ def api_trends():
                 pass
 
     return jsonify(results)
+
+
+# --- Agent API ---
+
+def _load_agent_memory(session_id):
+    """加载 Agent Memory，优先新格式，兼容旧 state.json。
+    返回 (mem, sdir, old_state) — 其中 mem 或 old_state 至少一个非空。"""
+    sdir = _session_dir(session_id)
+    mem = WorkingMemory.load(session_id, sdir)
+    if mem:
+        return mem, sdir, None
+    old_state = _load_state(session_id)
+    return None, sdir, old_state
+
+
+@app.route('/api/agent/<session_id>/state', methods=['GET'])
+def agent_state(session_id):
+    """查询 Agent 当前记忆状态"""
+    mem, sdir, old_state = _load_agent_memory(session_id)
+    if not mem:
+        if not old_state:
+            return jsonify({'error': 'Session 不存在'}), 404
+        return jsonify({
+            'session_id': session_id,
+            'phase': old_state.get('status', 'unknown'),
+            'note': '旧版 session，请使用 /api/session/* 端点',
+        })
+    return jsonify({
+        'session_id': session_id,
+        'phase': mem.phase,
+        'state': mem.get_state_for_llm(),
+        'thought_history': mem.thought_history[-20:],
+        'shots': [ss.to_dict() for ss in mem.shots.values()],
+    })
+
+
+@app.route('/api/agent/<session_id>/stream', methods=['GET'])
+def agent_stream(session_id):
+    """
+    SSE 流式端点 — 启动 Agent 循环，实时推送思考过程。
+
+    事件类型:
+    - thinking: Agent 正在分析
+    - tool_call: 调用工具
+    - tool_result: 工具执行结果
+    - eval: 质量评估
+    - replan: 重规划
+    - error: 异常
+    - complete: 完成
+    """
+    mem, sdir, old_state = _load_agent_memory(session_id)
+    if not mem:
+        if not old_state:
+            return jsonify({'error': 'Session 不存在，请先上传文档'}), 404
+
+        mem = WorkingMemory(session_id, sdir, old_state.get('config', {}))
+        mem.phase = 'init'
+        mem.config['filepath'] = old_state.get('filepath', '')
+        mem.config['filename'] = old_state.get('filename', '')
+        mem.save()  # 写入 agent_state.json，不影响管线 state.json
+        """SSE 生成器，在后台线程运行 Agent 并通过队列推送事件"""
+        import queue
+        import threading as _th
+        event_queue = queue.Queue(maxsize=200)  # 有界队列防内存溢出
+        stop_event = _th.Event()  # 客户端断开时通知 Agent 停止
+
+        def on_thought(event_type, data):
+            event_queue.put({'event': event_type, 'data': data})
+
+        def run_agent():
+            try:
+                agent = ZhiyanAgent(mem, sdir)
+                agent.run(on_thought=on_thought, stop_event=stop_event)
+            except Exception as e:
+                event_queue.put({'event': 'error',
+                                'data': {'content': f'Agent 崩溃: {str(e)[:300]}'}})
+
+        t = _th.Thread(target=run_agent, daemon=True)
+        t.start()
+
+        # 从队列读取事件并写入 SSE
+        timeout_count = 0
+        try:
+            while True:
+                try:
+                    evt = event_queue.get(timeout=2)
+                    timeout_count = 0
+                    event_type = evt['event']
+                    data = evt['data']
+                    yield f"event: {event_type}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+                    if event_type == 'complete':
+                        yield f"event: final_state\ndata: {json.dumps({'phase': mem.phase, 'session_id': session_id}, ensure_ascii=False)}\n\n"
+                        break
+                    if event_type == 'error' and 'Agent 崩溃' in str(data.get('content', '')):
+                        break
+
+                except queue.Empty:
+                    timeout_count += 1
+                    # 发送心跳保持连接
+                    yield f": heartbeat\n\n"
+                    sse_timeout = int(os.environ.get('AGENT_SSE_TIMEOUT', '60'))
+                    if timeout_count > sse_timeout:
+                        yield f"event: error\ndata: {json.dumps({'content': 'Agent 超时'}, ensure_ascii=False)}\n\n"
+                        break
+
+                # Agent 线程已结束且队列空
+                if not t.is_alive() and event_queue.empty():
+                    break
+        finally:
+            # 客户端断开或生成器被回收时，通知 Agent 停止
+            stop_event.set()
+
+    return app.response_class(
+        generate(),
+        mimetype='text/event-stream',
+        headers={
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive',
+            'X-Accel-Buffering': 'no',
+            'Access-Control-Allow-Origin': '*',
+        }
+    )
+
+
+@app.route('/api/agent/<session_id>/run', methods=['POST'])
+def agent_run_sync(session_id):
+    """同步运行 Agent（非流式），返回最终状态。适合调试"""
+    mem, sdir, old_state = _load_agent_memory(session_id)
+    if not mem:
+        if not old_state:
+            return jsonify({'error': 'Session 不存在'}), 404
+        mem = WorkingMemory(session_id, sdir, old_state.get('config', {}))
+        mem.config['filepath'] = old_state.get('filepath', '')
+        mem.save()
+
+    try:
+        agent = ZhiyanAgent(mem, sdir)
+        result = agent.run()
+        return jsonify({
+            'result': result,
+            'phase': mem.phase,
+            'thought_history': mem.thought_history[-30:],
+        })
+    except Exception as e:
+        logger.error(f"Agent 同步运行失败: {e}", exc_info=True)
+        return jsonify({'error': str(e)[:500]}), 500
 
 
 if __name__ == '__main__':

@@ -1,4 +1,6 @@
-"""文档解析 — .txt 纯文本 / .docx Word表格（优先提取表格）"""
+"""
+文档解析 — .txt / .docx，优先提取表格
+"""
 
 import os
 from config import MAX_CONTENT_LENGTH
@@ -11,7 +13,7 @@ def parse_document(filepath):
     )
     if not content:
         raise ValueError(f"不支持的文件格式: {ext}")
-    return content[:MAX_CONTENT_LENGTH]  # 截断保护
+    return content[:MAX_CONTENT_LENGTH]
 
 
 def _parse_txt(filepath):
@@ -20,7 +22,6 @@ def _parse_txt(filepath):
 
 
 def _parse_docx(filepath):
-    """优先提取表格（分镜脚本常以Word表格存在），无表格则读段落"""
     from docx import Document
     doc = Document(filepath)
 

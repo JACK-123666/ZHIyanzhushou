@@ -1,14 +1,11 @@
-"""
-智演助手 1.5 — 配置中心
-密钥 | 模型端点 | 风格模板 | 镜头语言映射 | 重试策略
-"""
+"""Zhiyan 配置中心"""
 
 import os
 
 # --- API 密钥 ---
 
-ARK_API_KEY = os.environ.get('ARK_API_KEY', '')          # 豆包 ARK（Seedream+Seedance 共用）
-DEEPSEEK_API_KEY = os.environ.get('DEEPSEEK_API_KEY', '')  # DeepSeek（分镜+Prompt）
+ARK_API_KEY = os.environ.get('ARK_API_KEY', '')
+DEEPSEEK_API_KEY = os.environ.get('DEEPSEEK_API_KEY', '')
 DEEPSEEK_BASE_URL = os.environ.get('DEEPSEEK_BASE_URL', 'https://api.deepseek.com')
 
 # --- 上传限制 ---
@@ -36,8 +33,6 @@ DURATION_MODES = {
 
 # --- 图片分辨率（Seedream 出图尺寸） ---
 
-# Seedream 要求最低 3686400 像素 (~3.7MP)，即 2560x1440+
-# size 参数使用 WIDTHxHEIGHT 格式
 RESOLUTIONS = {
     '1920x1080': {'label': '1920x1080 (16:9)', 'width': 2560, 'height': 1440, 'ratio': '16:9', 'size': '2560x1440'},
     '1024x1024': {'label': '1024x1024 (1:1)',  'width': 2048, 'height': 2048, 'ratio': '1:1',  'size': '2048x2048'},
@@ -48,24 +43,33 @@ RESOLUTIONS = {
 
 AI_MODELS = {
     'deepseek': {
-        'name': 'DeepSeek V4 Pro [1M]',
+        'name': 'DeepSeek V4 Pro',
         'api_url': f"{DEEPSEEK_BASE_URL}/chat/completions",
         'api_key': DEEPSEEK_API_KEY,
         'model': 'deepseek-v4-pro',
     },
     'seedream': {
-        'name': 'Seedream 5.0 Lite（文生图）',
+        'name': 'Seedream 5.0',
         'api_url': 'https://ark.cn-beijing.volces.com/api/v3/images/generations',
         'api_key': ARK_API_KEY,
         'model': os.environ.get('SEEDREAM_ENDPOINT', ''),
     },
     'seedance': {
-        'name': 'Seedance 2.0 Fast（图生视频）',
+        'name': 'Seedance 2.0',
         'api_url': 'https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks',
         'api_key': ARK_API_KEY,
-        'model': os.environ.get('SEEDANCE_ENDPOINT', ''),
+        'model': os.environ.get('SEEDANCE_ENDPOINT', 'doubao-seedance-2-0-fast-260128'),
     },
 }
+
+# 成本估算（USD，参考 2025 年定价）
+COST_PER_IMAGE = float(os.environ.get('COST_PER_IMAGE', '0.02'))       # Seedream ~$0.02/image
+COST_PER_VIDEO_SEC = float(os.environ.get('COST_PER_VIDEO_SEC', '0.12')) # Seedance Fast 480p ~$0.12/sec
+COST_PER_LLM_CALL = float(os.environ.get('COST_PER_LLM_CALL', '0.005'))  # DeepSeek ~$0.005/call
+
+# 成本控制：最大镜数、单镜最长秒数
+MAX_SHOTS_FOR_COST = 10
+MAX_SHOT_DURATION = 8
 
 # --- 镜头语言：中文 → 英文构图指令（注入 image_prompt） ---
 

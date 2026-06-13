@@ -125,7 +125,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     removeFileBtn.addEventListener('click', resetAll);
-    generateButton.addEventListener('click', startPipeline);
+    // generateButton 点击由 Agent 模块统一接管（见下方 Agent 模式代码）
     downloadBtn.addEventListener('click', function () {
         if (currentSessionId) window.open('/api/session/' + currentSessionId + '/download', '_blank');
     });
@@ -295,11 +295,17 @@ function updatePipelineStat(el, val) {
     el.querySelector('.chip-val').textContent = val;
 }
 
-function showStats(shots, scenes, chars) {
+function showStats(shots, scenes, chars, cost) {
     pipelineStats.style.display = 'flex';
     updatePipelineStat(statShots, shots);
     updatePipelineStat(statScenes, scenes);
     updatePipelineStat(statChars, chars);
+    if (cost !== undefined && cost !== null) {
+        var costChip = document.getElementById('statCost');
+        var costVal = document.getElementById('costVal');
+        if (costChip) costChip.style.display = 'flex';
+        if (costVal) costVal.textContent = '$' + cost;
+    }
 }
 
 function updatePipelineStep(status) {
@@ -325,6 +331,27 @@ function updatePipelineStep(status) {
     }
 }
 
+// 共享：构建上传 FormData（流水线和 Agent 共用）
+function buildFormData(file) {
+    var fd = new FormData();
+    fd.append('file', file);
+    fd.append('mode', currentMode);
+    if (currentMode === 'auto') {
+        fd.append('total_duration', document.getElementById('totalDuration').value);
+    } else {
+        fd.append('style_template', document.getElementById('styleTemplate').value);
+        fd.append('duration_mode', document.getElementById('durationMode').value);
+        fd.append('resolution', document.getElementById('resolution').value);
+        fd.append('video_quality', document.getElementById('videoQuality').value);
+        fd.append('auto_subtitle', document.getElementById('autoSubtitle').value);
+        fd.append('auto_sfx', document.getElementById('autoSfx').value);
+        fd.append('original_audio_level', document.getElementById('bgmVolume').value);
+        fd.append('bgm_enabled', document.getElementById('bgmEnabled').value);
+        fd.append('bgm_volume', document.getElementById('bgmVolumeSlider').value);
+    }
+    return fd;
+}
+
 async function startPipeline() {
     var file = fileInput.files[0];
     if (!file) return showToast(t('toast_no_file'), 'error');
@@ -333,23 +360,7 @@ async function startPipeline() {
     progressContainer.style.display = 'block';
     videoResult.style.display = 'none';
 
-    var formData = new FormData();
-    formData.append('file', file);
-    formData.append('mode', currentMode);
-
-    if (currentMode === 'auto') {
-        formData.append('total_duration', document.getElementById('totalDuration').value);
-    } else {
-        formData.append('style_template', document.getElementById('styleTemplate').value);
-        formData.append('duration_mode', document.getElementById('durationMode').value);
-        formData.append('resolution', document.getElementById('resolution').value);
-        formData.append('video_quality', document.getElementById('videoQuality').value);
-        formData.append('auto_subtitle', document.getElementById('autoSubtitle').value);
-        formData.append('auto_sfx', document.getElementById('autoSfx').value);
-        formData.append('original_audio_level', document.getElementById('bgmVolume').value);
-        formData.append('bgm_enabled', document.getElementById('bgmEnabled').value);
-        formData.append('bgm_volume', document.getElementById('bgmVolumeSlider').value);
-    }
+    var formData = buildFormData(file);
 
     try {
         progressTitle.textContent = '正在上传...';
@@ -368,7 +379,7 @@ async function startPipeline() {
         res = await fetch('/api/session/' + currentSessionId + '/design-shots', { method: 'POST' });
         data = await res.json();
         if (!res.ok) throw new Error(data.error);
-        showStats(data.shot_count, data.scene_count || '-', data.character_count || '-');
+        showStats(data.shot_count, data.scene_count || '-', data.character_count || '-', data.estimated_cost_usd);
         // 保存分镜预览数据供后续步骤更新状态
         var shotsPreview = data.shots_preview || [];
         if (shotsPreview.length) renderShotsPreview(data);
@@ -502,3 +513,231 @@ document.getElementById('trendsSearch')?.addEventListener('input', function () {
   clearTimeout(trendsSearchTimer);
   trendsSearchTimer = setTimeout(loadTrends, 400);
 });
+
+// ═══════════════════════════════════════════════════════════════
+// Agent 模式 — SSE 流式客户端 + Agent 思考流渲染
+// ═══════════════════════════════════════════════════════════════
+
+var agentModeActive = false;
+var agentEventSource = null;
+var agentFeedContainer = document.getElementById('agentFeedContainer');
+var agentFeed = document.getElementById('agentFeed');
+var agentFeedStatus = document.getElementById('agentFeedStatus');
+
+// Agent mode toggle
+var agentModeToggle = document.getElementById('agentModeToggle');
+var agentModeCheckbox = document.getElementById('agentModeCheckbox');
+
+// 文件选择后显示 Agent 模式开关
+var origHandleFile = handleFile;
+handleFile = function(file) {
+    origHandleFile(file);
+    if (agentModeToggle) agentModeToggle.style.display = 'flex';
+};
+
+// 重置时隐藏
+var origResetAll = resetAll;
+resetAll = function() {
+    stopAgentStream();
+    agentModeActive = false;
+    if (agentModeCheckbox) agentModeCheckbox.checked = false;
+    if (agentModeToggle) agentModeToggle.style.display = 'none';
+    if (agentFeedContainer) agentFeedContainer.style.display = 'none';
+    origResetAll();
+};
+
+// Agent checkbox 切换
+if (agentModeCheckbox) {
+    agentModeCheckbox.addEventListener('change', function() {
+        agentModeActive = this.checked;
+    });
+}
+
+// 重写 generateButton 点击逻辑
+var origStartPipeline = startPipeline;
+generateButton.addEventListener('click', function() {
+    if (agentModeActive) {
+        startAgentPipeline();
+    } else {
+        origStartPipeline();
+    }
+});
+
+// ── Agent 流水线入口 ──
+
+async function startAgentPipeline() {
+    var file = fileInput.files[0];
+    if (!file) return showToast(t('toast_no_file'), 'error');
+
+    configPanel.style.display = 'none';
+    progressContainer.style.display = 'none';  // 隐藏传统进度条
+    agentFeedContainer.style.display = 'block';
+    videoResult.style.display = 'none';
+
+    // 清空 feed
+    agentFeed.innerHTML = '';
+    setAgentStatus('connecting', t('agent_connecting'));
+
+    // 1. 创建 session（复用共享 buildFormData）
+    var formData = buildFormData(file);
+
+    try {
+        addAgentEntry('thinking', '📄 上传文档，创建 Agent 会话...');
+        var res = await fetch('/api/session/create', { method: 'POST', body: formData });
+        var data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        currentSessionId = data.session_id;
+        addAgentEntry('tool_call', '✅ 会话创建成功: ' + currentSessionId.slice(0, 8) + '...');
+
+        // 2. 连接 SSE 流
+        connectAgentStream(currentSessionId);
+
+    } catch (err) {
+        addAgentEntry('error', '❌ 启动失败: ' + err.message);
+        showToast(t('toast_generate_fail') + err.message, 'error');
+    }
+}
+
+// ── SSE 连接 ──
+
+function connectAgentStream(sessionId) {
+    stopAgentStream();
+
+    var url = '/api/agent/' + sessionId + '/stream';
+    agentEventSource = new EventSource(url);
+
+    agentEventSource.addEventListener('thinking', function(e) {
+        var d = JSON.parse(e.data);
+        addAgentEntry('thinking', '💭 ' + (d.content || ''));
+    });
+
+    agentEventSource.addEventListener('tool_call', function(e) {
+        var d = JSON.parse(e.data);
+        var icon = getToolIcon(d.tool || '');
+        addAgentEntry('tool_call', icon + ' 调用: <code>' + d.tool + '</code>');
+    });
+
+    agentEventSource.addEventListener('tool_result', function(e) {
+        var d = JSON.parse(e.data);
+        var text = d.summary || '';
+        // summary 可能是 JSON 字符串，尝试解析并提取可读字段
+        try {
+            var parsed = JSON.parse(d.summary || '{}');
+            // parsed 结构: {success: true, data: {...tool_result...}}
+            var inner = parsed.data || parsed;
+            if (typeof inner !== 'string') {
+                text = inner.note || inner.shot_count + ' shots' || inner.prompt_count + ' prompts' ||
+                       (inner.status ? inner.status + (inner.shot_id ? ' ' + inner.shot_id : '') : '') ||
+                       d.summary || '';
+            }
+        } catch(_) { text = d.summary || ''; }
+        addAgentEntry('tool_result', '✅ ' + (d.tool || '') + ' → ' + text);
+    });
+
+    agentEventSource.addEventListener('eval', function(e) {
+        var d = JSON.parse(e.data);
+        if (d.success === false) {
+            addAgentEntry('error', '⚠️ ' + (d.tool || '') + ' 失败: ' + (d.error || '') + ' [' + (d.category || '') + ']');
+        }
+    });
+
+    agentEventSource.addEventListener('replan', function(e) {
+        var d = JSON.parse(e.data);
+        addAgentEntry('thinking', '🔄 重规划: ' + (d.category || '') + ' → ' + (d.error || '').slice(0, 80));
+    });
+
+    agentEventSource.addEventListener('error', function(e) {
+        var msg = 'Agent 异常';
+        try {
+            var d = JSON.parse(e.data);
+            msg = d.content || msg;
+        } catch(_) {}
+        addAgentEntry('error', '❌ ' + msg);
+
+        // 检查是否是致命错误
+        if (msg.indexOf('Agent 崩溃') >= 0 || msg.indexOf('超时') >= 0) {
+            setAgentStatus('error', msg);
+            stopAgentStream();
+        }
+    });
+
+    agentEventSource.addEventListener('complete', function(e) {
+        var d = {};
+        try { d = JSON.parse(e.data); } catch(_) {}
+        addAgentEntry('tool_result', '🎬 <strong>' + t('agent_done') + '</strong>');
+        setAgentStatus('done', t('agent_done'));
+
+        // 显示下载
+        if (d.phase === 'done') {
+            setTimeout(function() {
+                agentFeedContainer.style.display = 'none';
+                videoResult.style.display = 'block';
+                // 尝试加载视频
+                fetch('/api/agent/' + sessionId + '/state')
+                    .then(function(r) { return r.json(); })
+                    .then(function(state) {
+                        // 查找最终视频
+                        if (state.phase === 'done') {
+                            resultVideo.src = '/api/session/' + sessionId + '/download';
+                            resultVideo.load();
+                        }
+                    }).catch(function() {});
+            }, 1500);
+        }
+    });
+
+    agentEventSource.onerror = function(e) {
+        // EventSource 自动重连，仅在彻底失败时提示
+        if (agentEventSource.readyState === EventSource.CLOSED) {
+            addAgentEntry('error', '❌ SSE 连接断开');
+            setAgentStatus('error', '连接断开');
+        }
+    };
+}
+
+function stopAgentStream() {
+    if (agentEventSource) {
+        agentEventSource.close();
+        agentEventSource = null;
+    }
+}
+
+// ── Agent Feed 渲染 ──
+
+function addAgentEntry(type, html) {
+    if (!agentFeed) return;
+    // 移除空状态提示
+    var empty = agentFeed.querySelector('.agent-feed-empty');
+    if (empty) empty.remove();
+
+    var entry = document.createElement('div');
+    entry.className = 'agent-entry agent-entry-' + type;
+    entry.innerHTML = '<span class="agent-entry-time">' + new Date().toLocaleTimeString() + '</span>' +
+                      '<span class="agent-entry-body">' + html + '</span>';
+    agentFeed.appendChild(entry);
+
+    // 滚动到底部
+    agentFeed.scrollTop = agentFeed.scrollHeight;
+}
+
+function setAgentStatus(status, text) {
+    if (!agentFeedStatus) return;
+    var dot = agentFeedStatus.querySelector('.status-dot');
+    var label = agentFeedStatus.querySelector('span:last-child');
+    if (dot) {
+        dot.className = 'status-dot status-' + status;
+    }
+    if (label) {
+        label.textContent = text;
+    }
+}
+
+function getToolIcon(toolName) {
+    var icons = {
+        'parse_document': '📄', 'design_shots': '🎬', 'generate_prompts': '📝',
+        'generate_image': '🎨', 'generate_video': '🎥', 'generate_narration': '🎙️',
+        'batch_generate_images': '🎨', 'batch_generate_videos': '🎥',
+        'compose_video': '🎬', 'check_status': '🔍',
+    };
+    return icons[toolName] || '🔧';
+}

@@ -1,6 +1,8 @@
-# services/trend_service.py
-"""智演助手侧 — MySQL 只读查询接口"""
-import pymysql, os, json
+"""
+剪辑趋势查询 — MySQL 只读接口
+"""
+
+import pymysql, os
 from dbutils.pooled_db import PooledDB
 from dotenv import load_dotenv
 
@@ -42,7 +44,6 @@ def _query(sql, params=None):
 
 
 def get_trending_techniques(dimension=None, limit=10):
-    """本周最热技法"""
     sql = """
         SELECT t.dimension, t.category, t.subcategory, t.detail,
                SUM(dt.video_count) as total_videos,
@@ -62,7 +63,6 @@ def get_trending_techniques(dimension=None, limit=10):
 
 
 def search_techniques(keywords: str, dimensions=None, limit=20):
-    """关键词搜索技法"""
     sql = """
         SELECT t.* FROM technique_taxonomy t
         WHERE (t.subcategory LIKE %s OR t.category LIKE %s OR t.dimension LIKE %s)
@@ -79,7 +79,6 @@ def search_techniques(keywords: str, dimensions=None, limit=20):
 
 
 def get_weekly_trend_context() -> str:
-    """返回可注入 LLM System Prompt 的文案片段"""
     trends = get_trending_techniques(limit=15)
     if not trends:
         return "（暂无趋势数据）"
